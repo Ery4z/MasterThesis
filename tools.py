@@ -13,6 +13,72 @@ import random as rd
 from matplotlib.colors import BoundaryNorm
 import scipy
 
+class CounterVehicleCFAR:
+    """This class is the implementation of the famous island problem. 
+    As the Spotted array returned by CFAR is a 0 and 1 mask in the heatmap, counting the number of vehicle is exactly this problem.
+    """
+    def countVehicle(self, grid) -> int:
+        m = len(grid)
+        n = len(grid[0])
+        result = 0
+        index_list = []
+        shape_list = []
+        for i in range(m):
+            for j in range(n):
+                if grid[i][j] == 1:
+                    new_shape = []
+                    result += 1
+                    index_list.append([i, j])
+                    
+                    self.waterLands(grid, i, j, new_shape)
+                    shape_list.append(list(new_shape))
+        return result, index_list, shape_list
+        
+    
+    #given the grid and start point, submerge the adjacent land
+    def waterLands(self, grid, i, j,new_shape):
+        m = len(grid)
+        n = len(grid[0])
+        grid[i][j] = 0
+        new_shape.append([i,j])
+        queue = [[i, j]]
+        x_dir = [0,0,1,-1]
+        y_dir = [1,-1,0,0]
+        
+        while queue:
+            curr = queue.pop(0)
+            cx = curr[0]
+            cy = curr[1]
+            
+            for i in range(4):
+                nx = cx + x_dir[i]
+                ny = cy + y_dir[i]
+                
+                if nx >= 0 and nx < m and ny >= 0 and ny < n and grid[nx][ny] == 1:
+                    queue.append([nx, ny])
+                    grid[nx][ny] = 0
+                    new_shape.append([nx,ny])
+
+
+def getPositionFromShapeAndData(shape, data):
+    """TODO: Calculate the incertitude
+
+    Args:
+        shape_list (_type_): _description_
+        data (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    most_energetic = shape[0]
+    top_energy = data[most_energetic[0]][most_energetic[1]]
+    
+    for pixel_pos in shape:
+        if data[pixel_pos[0]][pixel_pos[1]] > top_energy:
+            most_energetic = pixel_pos
+            top_energy = data[pixel_pos[0]][pixel_pos[1]]
+    return most_energetic
+
 
 # from LELEC2885 - Image Proc. & Comp. Vision
 def resize_and_fix_origin(kernel, size):
@@ -66,7 +132,7 @@ class DataWrapper:
 
         self.radar_parameters = {
             "distance":[70,0],
-            "speed":[-100,100],
+            "speed":[-27.78,27.78],
         }
 
         self.heatmap_dir = heatmap_dir
@@ -99,7 +165,8 @@ class DataWrapper:
         self.load_picture_data()
     
     def filter(self,data):
-        self.calculate_heatmap_mean()
+        if self.heatmap_mean is None:
+            self.calculate_heatmap_mean()
         data = data - self.background_data
         data = data - self.heatmap_mean
 
@@ -112,10 +179,53 @@ class DataWrapper:
         data = scipy.signal.convolve2d(data, kernel, mode='same')
         
         # data = data - filtred_bg
-
-
-        
         return data
+    
+    def calculate_energy(self,data):
+        return np.sum(np.abs(data)**2)
+    
+    def analyse_couple(self,index):
+        analyse = {
+            "heatmap_energy":0,
+            "vehicle_heatmap_info":[{"distance":0,"speed":0}]
+        }
+        
+        solver = CounterVehicleCFAR()
+        heatmap_data = self.heatmap_data[index]
+        filtered_heatmap_data = self.filter(heatmap_data)
+        
+        cfar_data, _, spotted = self.CFAR_loaded(filtered_heatmap_data)
+        
+        result, index_list, shape_list = solver.countVehicle(spotted)
+        
+        vehicle_heatmap_info = []
+        raw_vehicle_heatmap_info =[]
+        
+        heatmap_shape = self.heatmap_data.shape
+        
+        rdist = self.radar_parameters["distance"]
+        rspeed = self.radar_parameters["speed"]
+        print(heatmap_shape)
+        if (len(shape_list)<=3):
+            for shape in shape_list:
+                pos = getPositionFromShapeAndData(shape, filtered_heatmap_data)
+                
+            
+                
+                
+                raw_vehicle_heatmap_info.append(pos)
+                # The weird index is because the [0] is the vertical axis and the [1] is the horizontal axis
+                # the vertical axis is counted from top to bottom and the horizontal axis is counted from left to right
+                vehicle_heatmap_info.append({
+                    "distance": (pos[0]/heatmap_shape[1])*(rdist[0]-rdist[1])+rdist[1],
+                    "speed": (pos[1]/heatmap_shape[2])*(rspeed[1]-rspeed[0])+rspeed[0]
+                })
+        
+        analyse["heatmap_energy"] = self.calculate_energy(filtered_heatmap_data)
+        analyse["vehicle_heatmap_info"] = vehicle_heatmap_info
+        analyse["raw_vehicle_heatmap_info"] = raw_vehicle_heatmap_info
+        
+        return analyse
         
     def get_color_map(self,data):
         # define the colormap
@@ -137,6 +247,14 @@ class DataWrapper:
 
     def set_background_data(self, background_data_path):
         self.background_data = np.abs(np.array(self.load_file(background_data_path)))
+        
+    def set_mean_heatmap_data(self, mean_data_path):
+        self.heatmap_mean = np.abs(np.array(self.load_file(mean_data_path)))
+    
+    def save_mean_heatmap_data(self, mean_data_path):
+        assert self.heatmap_mean is not None, "Please calculate the heatmap mean data first."
+        with open(mean_data_path,"wb") as f:
+            pickle.dump(self.heatmap_mean, f)
     
     def remove_background_data(self):
         self.heatmap_data = self.heatmap_data - self.background_data
@@ -313,9 +431,10 @@ class DataWrapper:
 
 if __name__ == "__main__":
     FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-    FILE_COUNT_TO_LOAD = 1000
+    FILE_COUNT_TO_LOAD = 100
     
-    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"data","graphes","1657880906.775549.doppler")
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
+    MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
     
     
 
@@ -333,6 +452,8 @@ if __name__ == "__main__":
     dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="")
     
     dataWrapper.set_background_data(BACKGROUND_FILE)
+    dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
+    
     # dataWrapper.remove_background_data()
 
     
@@ -341,7 +462,9 @@ if __name__ == "__main__":
     
     for i in random_sample:
         # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
+        print(dataWrapper.analyse_couple(i))
         dataWrapper.plot_CFAR(i)
+        
 
 
     
