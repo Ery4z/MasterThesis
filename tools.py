@@ -19,7 +19,47 @@ import scipy
 import torch
 import cv2
 import math
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
+CAMERA_PARAM = {'focal_length':5695.8, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
+
+def calculate_energy(data):
+    """Calculate the energy of an array. Useful to know if the data is meaningful
+
+    Args:
+        data (np.array): Array to calculate energy from
+
+    Returns:
+        float: Energy of the array
+    """
+    return np.sum(np.abs(data)**2)
+
+def load_analysis_result(path:str):
+    heatmap_data = pickle.load(open(path + "/detected_vehicle_heatmap.pkl", "rb"))    
+    image_data = pickle.load(open(path + "/detected_vehicle_image.pkl", "rb"))
+    energy = pickle.load(open(path + "/energy_heatmap.pkl", "rb"))
+    pos_list = pickle.load(open(path + "/pos_list.pkl", "rb"))
+    missmatch = pickle.load(open(path + "/count_missmatch.pkl", "rb"))
+    
+    return heatmap_data, image_data, energy, pos_list ,missmatch
+
+def plot_analysis_result(heatmap_data, image_data, energy, pos_list,missmatch, camera_parameters):
+    plot_3d_world_pos(pos_list,camera_parameters)
+    
+    plt.figure()
+    plt.subplot(2,2,1)
+    plt.hist(heatmap_data,bins=10)
+    plt.title("Number of vehicle detected by heatmap")
+    plt.subplot(2,2,2)
+    plt.hist(image_data,bins=10)
+    plt.title("Number of vehicle detected by image")
+    plt.subplot(2,2,3)
+    plt.hist(slog(energy),bins=10)
+    plt.title("Energy of the heatmap")
+    plt.subplot(2,2,4)
+    plt.hist(missmatch,bins=(max(missmatch)-min(missmatch)))
+    plt.title("Number of missmatch between heatmap and image")
+    plt.show()
 
 def get_yolo():
     '''At the time of writign this a bug happen after importing yolo (impossible to plot with matplotlib) this is the fix'''
@@ -36,10 +76,64 @@ class MultimodalAnalysisResult:
         self.heatmap_info = heatmap_info
         self.raw_heatmap_info = raw_heatmap_info
         self.image_info = image_info
+
+
+def plot_3d_world_pos(pos_list,camera_parameters):
+    def plot_camera(ax,camera_parameters):
         
+        
+        v = np.array([[0, 0.3, 0.3], [0, 0.3, -0.3], [0, 0.3, -0.3],  [0, -0.3, -0.3], [-0.3, 0, 0]])
+        ax.scatter3D(v[:, 0], v[:, 1], v[:, 2])
+        
+        verts = [ [v[0],v[1],v[4]], [v[0],v[2],v[4]],
+        [v[2],v[1],v[4]], [v[2],v[3],v[4]], [v[0],v[1],v[2],v[3]]]
+        
+        ax.add_collection3d(Poly3DCollection(verts, facecolors='cyan', linewidths=1, edgecolors='r', alpha=.25))
+
+        camera_center = np.array([-0.3, 0, 0])
+        fovY = camera_parameters['fov']
+        image_size = camera_parameters['image_size']
+        fovZ = fovY * image_size[1] / image_size[0]
+        distanceX = 70
+        
+        point_FOV = [camera_center+np.array([70,distanceX*math.tan(fovY/2),-1]),
+                    camera_center+np.array([70,distanceX*math.tan(fovY/2),10]),
+                    camera_center+np.array([70,-distanceX*math.tan(fovY/2),10]),
+                    camera_center+np.array([70,-distanceX*math.tan(fovY/2),-1])]
+        lines = [ [camera_center,point_FOV[0]], [camera_center,point_FOV[1]], [camera_center,point_FOV[2]], [camera_center,point_FOV[3]]]
+        for l in lines:
+            ax.plot3D(*zip(*l), color='r')
+    
+    
+    to_plot = np.array(pos_list)
+    #Plot camera
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    
+    
+    ax.scatter3D(to_plot[:,0],to_plot[:,1],to_plot[:,2])
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    
+    plot_camera(ax,camera_parameters)
+    ax.set_box_aspect(aspect=(1, 1, 1))
+    plt.show()
+
+    
+    
+
+
 def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,camera_parameters:dict):
-    ''' Require the following structure
-    '''
+    """Convert the data extracted from the image and heatmap to 3D world position.
+
+    Args:
+        analysis (MultimodalAnalysisResult): Data returned from the analysis
+        camera_parameters (dict): Intrinsict parameters from the camera
+
+    Returns:
+        [3]float: 3d pos of the item
+    """
     fx, fy = camera_parameters['focal_length'], camera_parameters['focal_length']
     cx = camera_parameters['principal_point'][0]
     cy = camera_parameters['principal_point'][1]
@@ -56,7 +150,7 @@ def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,came
     yaw = math.atan2(x-cx, fx)
     pitch = math.atan2(y-cy, fy)
     
-    absolute_position = [distance * math.cos(pitch) * math.cos(yaw), distance * math.cos(pitch) * math.sin(yaw), distance * math.sin(pitch)]
+    absolute_position = [distance * math.cos(pitch) * math.cos(yaw), -distance * math.cos(pitch) * math.sin(yaw), distance * math.sin(pitch)]
     
     return absolute_position
     
@@ -175,7 +269,8 @@ def slog(data):
     Returns:
         np.array: array
     """
-    return np.nan_to_num(np.log(np.abs(data))*np.sign(data))
+    out = np.where(data > 0) 
+    return np.nan_to_num(np.log(np.abs(data[out]))*np.sign(data[out]))
 
 
 def triangle_kernel(kerlen):
@@ -216,7 +311,7 @@ class DataWrapper:
             "distance":[70,0],
             "speed":[-27.78,27.78],
         }
-        self.camera_parameters = {'focal_length':5695.8, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
+        self.camera_parameters = CAMERA_PARAM
 
         self.heatmap_dir = heatmap_dir
         self.picture_dir = picture_dir
@@ -277,6 +372,14 @@ class DataWrapper:
         # data = data - filtred_bg
         return data
     
+    def set_filter(self,customfilter):
+        """Set the filter to use for the heatmap data
+
+        Args:
+            filter (function): Filter function to use
+        """
+        self.filter = customfilter
+    
     def calculate_energy(self,data):
         """Calculate the energy of an array. Useful to know if the data is meaningful
 
@@ -331,7 +434,7 @@ class DataWrapper:
         
     
     
-    def analyse_couple(self,index,plot=False):
+    def analyse_couple(self,index,plot=False,cfar_threshold=30):
         """Utility function to analyse the couple of data.
         This function is not mean for data pipeline but for user end.
 
@@ -352,7 +455,7 @@ class DataWrapper:
         heatmap_data = self.heatmap_data[index]
         filtered_heatmap_data = self.filter(heatmap_data)
         
-        cfar_data, _, spotted = self.CFAR_loaded(filtered_heatmap_data)
+        cfar_data, _, spotted = self.CFAR_loaded(filtered_heatmap_data,threshold=cfar_threshold)
         
         result, index_list, shape_list = solver.countVehicle(spotted)
         
@@ -363,7 +466,6 @@ class DataWrapper:
         
         rdist = self.radar_parameters["distance"]
         rspeed = self.radar_parameters["speed"]
-        print(heatmap_shape)
         if (len(shape_list)<=3):
             for shape in shape_list:
                 pos = getPositionFromShapeAndData(shape, filtered_heatmap_data)
@@ -537,7 +639,7 @@ class DataWrapper:
             self.calculate_heatmap_mean()
         self.heatmap_data = self.heatmap_data - self.heatmap_mean
         
-    def CFAR_loaded(self,data):
+    def CFAR_loaded(self,data,threshold=30):
         """Calculate the CFAR
 
         Args:
@@ -553,7 +655,7 @@ class DataWrapper:
         maxmoy = np.maximum.reduce([moyG, moyD, moyH, moyB])
 
         magncfar = fast_convolution(signal, np.ones((4, 4))/16) - 1.1*maxmoy
-        threshcfar = max(30, 1+0.5*(np.max(magncfar)-1))
+        threshcfar = max(threshold, 1+0.5*(np.max(magncfar)-1))
         loccfar = np.where(magncfar >= threshcfar)
 
         spotted = np.zeros(signal.shape)
@@ -687,15 +789,16 @@ class DataWrapper:
         
         plt.show()
 
-    def pipeline_process(index):
-        result_analysis = self.analyse_couple(index, plot=False)
+    def pipeline_process(self,index,debug=False,cfar_threshold=30):
+        result_analysis = self.analyse_couple(index, plot=False, cfar_threshold=cfar_threshold)
         
         # Check if the number of detected object match the number of object in the picture
-        detected_heatmap_count = len(result_analysis["heatmap_info"])
-        detected_image_count = len(result_analysis["image_info"])
+        detected_heatmap_count = len(result_analysis.heatmap_info)
+        detected_image_count = len(result_analysis.image_info)
         if detected_heatmap_count != detected_image_count:
-            print("WARNING: {} heatmap objects detected but {} image objects detected".format(detected_heatmap_count,detected_image_count))
-            return None
+            if debug: 
+                print("WARNING: {} heatmap objects detected but {} image objects detected".format(detected_heatmap_count,detected_image_count))
+            return None,result_analysis
         
         # TODO: Continue the analysis part, Convert the cordinate to 3D base
         
@@ -712,13 +815,13 @@ class DataWrapper:
         
         # TODO: Support multiple object
         if detected_heatmap_count != 1:
-            return None
+            return None,result_analysis
         
         pos_3d = from_multimodal_analysis_result_to_3d(result_analysis,self.camera_parameters)
         
         
         
-        return pos_3d
+        return pos_3d, result_analysis
         
         
         # Check if the scale of the 3D object make sense
@@ -759,8 +862,9 @@ def test1 ():
     for i in random_sample:
         # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
         dataWrapper.pipeline_process(i)
-        dataWrapper.analyse_couple(i,plot=True)
-
+        ana = dataWrapper.analyse_couple(i,plot=True)
+        res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
+        print(res)
         # dataWrapper.plot_CFAR(i)
 
 def test2():
@@ -775,10 +879,132 @@ def test2():
     
     res = from_multimodal_analysis_result_to_3d(struct_analyse,camera_parameters)
     print(res)
+    
+def analyse_dataset(BATCH_SIZE = 1000,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=30):
+
+    
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
+    MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
+    
+    
+
+    heatmap_directory = os.path.join(FILE_DIRECTORY, "data","graphes")
+    picture_directory = os.path.join(FILE_DIRECTORY, "data","images")
+    
+    count_error = 0 
+    detected_vehicle_heatmap = []
+    detected_vehicle_image = []
+    missmatch_count_heatmap_image = []
+    
+    energy_heatmap = []
+    pos_list = []
+    timestamps_to_load_total = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
+    timestamps_to_load_total = timestamps_to_load_total[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load_total))]
+    for batch_index in tqdm(range(0,math.ceil(len(timestamps_to_load_total)/BATCH_SIZE)),desc="Batch"):
+    
+
+        timestamps_to_load = timestamps_to_load_total[batch_index*BATCH_SIZE:min((batch_index+1)*BATCH_SIZE,len(timestamps_to_load_total))]
+
+        dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="")
+        
+        dataWrapper.set_background_data(BACKGROUND_FILE)
+        dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
+        if customfilter is not None:
+            dataWrapper.filter = customfilter
+        # dataWrapper.filter = customfilter
+        # dataWrapper.remove_background_data()
+
+        
+        
+        # random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),100)
+        res_analyses = []
+        
+        for i in tqdm(range(len(timestamps_to_load)),desc="Analysing couple"): #(random_sample:
+            # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
+            res,res_ana = dataWrapper.pipeline_process(i,cfar_threshold=cfar_threshold)
+            res_analyses.append(res_ana)
+            if res is not None:
+                pos_list.append(res)
+                
+        
+        # Some metrics on the quality of the detection
+        
+        
+        for ana in res_analyses:
+            detected_vehicle_heatmap.append(len(ana.heatmap_info))
+            detected_vehicle_image.append(len(ana.image_info))
+            energy_heatmap.append(ana.heatmap_energy)
+            missmatch_count_heatmap_image.append(len(ana.heatmap_info) - len(ana.image_info))
+            if len(ana.heatmap_info) != len(ana.image_info):
+                count_error += 1
+    
+    
+    pos_list = np.array(pos_list)
+    
+    
+    
+    
+    detected_vehicle_heatmap = np.array(detected_vehicle_heatmap)
+    detected_vehicle_image = np.array(detected_vehicle_image)
+    energy_heatmap = np.array(energy_heatmap)
+    missmatch_count_heatmap_image = np.array(missmatch_count_heatmap_image)
+    
+    
+    # Autoincrement of the save directory
+    # Create a save directory if it does not exist
+    if not os.path.exists(os.path.join(FILE_DIRECTORY,"dataset_analysis_save")):
+        os.makedirs(os.path.join(FILE_DIRECTORY,"dataset_analysis_save"))
+    ANA_DIRECTORY = os.path.join(FILE_DIRECTORY,"dataset_analysis_save",f"analysis_{len(os.listdir(os.path.join(FILE_DIRECTORY,'dataset_analysis_save')))}")
+    if not os.path.exists(ANA_DIRECTORY):
+        os.makedirs(ANA_DIRECTORY)
+        
+    
+    with open(os.path.join(ANA_DIRECTORY,"pos_list.pkl"),"wb") as f:
+        pickle.dump(pos_list,f)
+    
+    with open(os.path.join(ANA_DIRECTORY,"detected_vehicle_heatmap.pkl"),"wb") as f:
+        pickle.dump(detected_vehicle_heatmap,f)
+    
+    with open(os.path.join(ANA_DIRECTORY,"detected_vehicle_image.pkl"),"wb") as f:
+        pickle.dump(detected_vehicle_image,f)
+        
+    with open(os.path.join(ANA_DIRECTORY,"energy_heatmap.pkl"),"wb") as f:
+        pickle.dump(energy_heatmap,f)
+        
+    with open(os.path.join(ANA_DIRECTORY,"count_missmatch.pkl"),"wb") as f:
+        pickle.dump(missmatch_count_heatmap_image,f)
+    
+    with open(os.path.join(ANA_DIRECTORY,"README.md"),"w") as f:
+        f.write(f"Number of error : {count_error} / {len(timestamps_to_load_total)}")
+    
+    return pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image
+
+def test4():
+    PATH_ANALYSIS = os.path.join(os.path.dirname(os.path.realpath(__file__)),"dataset_analysis_save","analysis_3")
+    
+    heatmap_data, image_data, energy, pos_list,missmatch = load_analysis_result(PATH_ANALYSIS)
+    
+    plot_analysis_result(heatmap_data, image_data, energy, pos_list,missmatch, CAMERA_PARAM)
+
+def test5():
+    FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    for i, cfar_threshold in enumerate(range(20,100,10)):
+        dirname = os.path.join(os.path.join(FILE_DIRECTORY,"dataset_analysis_save"),f"analysis_{7+i}")
+        heatmap_data, image_data, energy, pos_list,missmatch = load_analysis_result(path=dirname)
+        loss = np.mean((missmatch)**2)
+        
+        print(f"CFAR_THRESHOLD: {cfar_threshold}")
+        print(f"\tloss: {loss}")
+        print(f"\tmean energy: {np.mean(energy)}")
+        print(f"\tmean missmatch: {np.mean(missmatch)}")
+        print(f"\tmean detected vehicle heatmap: {np.mean(heatmap_data)}")
 
 if __name__ == "__main__":
-    test1()
+    # test1()
     # test2()
-
+    # test3()
+    # test4()
+    # analyse()
+    test5()
 
     
