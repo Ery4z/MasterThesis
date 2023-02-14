@@ -18,6 +18,7 @@ from matplotlib.colors import BoundaryNorm
 import scipy
 import torch
 import cv2
+import math
 
 
 def get_yolo():
@@ -26,6 +27,40 @@ def get_yolo():
     model = torch.hub.load("ultralytics/yolov5", "yolov5s")
     matplotlib.use(b)
     return model
+
+class MultimodalAnalysisResult:
+    def __init__(self,timestamp:str,heatmap_energy:float,heatmap_info:list,raw_heatmap_info:list,image_info:list):
+
+        self.timestamp = timestamp
+        self.heatmap_energy = heatmap_energy
+        self.heatmap_info = heatmap_info
+        self.raw_heatmap_info = raw_heatmap_info
+        self.image_info = image_info
+        
+def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,camera_parameters:dict):
+    ''' Require the following structure
+    '''
+    fx, fy = camera_parameters['focal_length'], camera_parameters['focal_length']
+    cx = camera_parameters['principal_point'][0]
+    cy = camera_parameters['principal_point'][1]
+    
+    image_size = camera_parameters['image_size']
+    fovX = camera_parameters['fov']
+    fovY = fovX * image_size[1] / image_size[0]
+    
+    
+    distance = analysis.heatmap_info[0]["distance"]
+    x = analysis.image_info[0]["x"]
+    y = analysis.image_info[0]["y"]
+    
+    yaw = math.atan2(x-cx, fx)
+    pitch = math.atan2(y-cy, fy)
+    
+    absolute_position = [distance * math.cos(pitch) * math.cos(yaw), distance * math.cos(pitch) * math.sin(yaw), distance * math.sin(pitch)]
+    
+    return absolute_position
+    
+
 
 class CounterVehicleCFAR:
     """This class is the implementation of the famous island problem. 
@@ -181,6 +216,7 @@ class DataWrapper:
             "distance":[70,0],
             "speed":[-27.78,27.78],
         }
+        self.camera_parameters = {'focal_length':5695.8, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
 
         self.heatmap_dir = heatmap_dir
         self.picture_dir = picture_dir
@@ -369,8 +405,9 @@ class DataWrapper:
             # self.picture_data_annotated[index] = bb_array
             self.plot_CFAR(index, annotated=True)
 
+        struct_analyse = MultimodalAnalysisResult(analyse["timestamp"],analyse["heatmap_energy"],analyse["heatmap_info"],analyse["raw_heatmap_info"],analyse["image_info"])
         
-        return analyse
+        return struct_analyse
         
     def get_color_map(self,data):
         """Create a custom colormap forcing the 0 to be inside, useful to represent image if the data is sometime negative.
@@ -653,14 +690,42 @@ class DataWrapper:
     def pipeline_process(index):
         result_analysis = self.analyse_couple(index, plot=False)
         
+        # Check if the number of detected object match the number of object in the picture
+        detected_heatmap_count = len(result_analysis["heatmap_info"])
+        detected_image_count = len(result_analysis["image_info"])
+        if detected_heatmap_count != detected_image_count:
+            print("WARNING: {} heatmap objects detected but {} image objects detected".format(detected_heatmap_count,detected_image_count))
+            return None
+        
         # TODO: Continue the analysis part, Convert the cordinate to 3D base
-
-
-
+        
+        '''
+        Content of the info_3D_object
+        
+        {
+            "position": [x,y,z],
+            "corners":[[x,y,z],[x,y,z],[x,y,z],[x,y,z]],
+            "object_type": "car|truck|bike|motorcycle|bus",
+        }
+        '''
+        
+        
+        # TODO: Support multiple object
+        if detected_heatmap_count != 1:
+            return None
+        
+        pos_3d = from_multimodal_analysis_result_to_3d(result_analysis,self.camera_parameters)
+        
+        
+        
+        return pos_3d
+        
+        
+        # Check if the scale of the 3D object make sense
         
 
 
-if __name__ == "__main__":
+def test1 ():
     FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
     FILE_COUNT_TO_LOAD = 100
     
@@ -693,10 +758,27 @@ if __name__ == "__main__":
     
     for i in random_sample:
         # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
+        dataWrapper.pipeline_process(i)
         dataWrapper.analyse_couple(i,plot=True)
 
         # dataWrapper.plot_CFAR(i)
-        
+
+def test2():
+    analyse = {'timestamp': '1657880853.943706', 'heatmap_energy': 6732783934474.394, 'heatmap_info': [{'distance': 53.8671875, 'speed': 8.247187500000003}], 'raw_heatmap_info': [[197, 166]], 'image_info': [{'bbox': [538, 576, 804, 749], 'x': 671, 'y': 662, 'class': 'car', 'confidence': 0.8863056302070618}]}
+    
+    struct_analyse = MultimodalAnalysisResult(analyse["timestamp"],analyse["heatmap_energy"],analyse["heatmap_info"],analyse["raw_heatmap_info"],analyse["image_info"])
+
+    
+    
+    
+    camera_parameters = {'focal_length':5695.8, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
+    
+    res = from_multimodal_analysis_result_to_3d(struct_analyse,camera_parameters)
+    print(res)
+
+if __name__ == "__main__":
+    test1()
+    # test2()
 
 
     
