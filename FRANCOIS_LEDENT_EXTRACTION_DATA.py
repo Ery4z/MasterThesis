@@ -3,7 +3,7 @@ Code réalisant l'alignement des séquences et l'extraction du contenu des trame
 pour les prises de vue réalisées dans le cadre du mémoire :
 
 Synchronization of Multimodal Data Flows for Real-Time AI Analysis
-Juin 2022, LEDENT François
+Juin 2022, LEDENT François, 2023 BOLTEAU Thomas
 """
 
 
@@ -15,12 +15,23 @@ import time
 
 from multiprocessing import Pool, cpu_count
 from multiprocessing.managers import BaseManager
+from PIL import Image
 
 
 NCPU = cpu_count()-1
 SAVE_CONTENT = True
 SAVE_DOPPLER = True
 SAVE_MAGN = True
+
+def verify_and_delete_images_in_dir(directory):
+    for file in os.listdir(directory):
+        data = None
+        try:
+            with Image.open(os.path.join(directory, file)) as img:
+                data = np.array(img)
+        except PIL.UnidentifiedImageError:
+            os.remove(os.path.join(directory, file))
+        
 
 
 def check_subdirs(*paths):
@@ -219,6 +230,12 @@ if __name__ == "__main__":
     path_source_camera = os.path.join(path,"jpeg")
     path_dest_radar = os.path.join(path,"graphes")
     path_dest_camera = os.path.join(path,"images")
-
+    
+    # Some images are corrupted, we delete them
+    verify_and_delete_images_in_dir(path_source_camera)
+    
+    # We align the images and the radar data
     align_seq(path_source_radar, path_source_camera, path_dest_radar, path_dest_camera)
+    
+    # We generate the radar heatmaps
     get_graphs(path_source_radar, path_dest_radar,True)
