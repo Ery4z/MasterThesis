@@ -1,0 +1,15 @@
+Analysis result for threshold 210000 using 3000 files:
+	mean energy: 16157852276839.834
+	mean missmatch: -0.156
+	error count: 793 / 3000 (26.43333333333333%)
+	loss: 0.4186666666666667
+	for datapoint having one vehicle (according to yolo):
+		mean missmatch: -0.315086782376502
+		mean energy: 17697436778693.016
+		loss: 0.4753004005340454
+		error count: 341 / 749 (45.52736982643525%)
+	for datapoint having no vehicle (according to yolo):
+		mean missmatch: 0.09157127991675339
+		mean energy: 15590358365974.16
+		loss: 0.09885535900104059
+		error count: 169 / 1922 (8.792924037460978%)
