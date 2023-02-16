@@ -31,7 +31,7 @@ def verify_and_delete_images_in_dir(directory):
         try:
             with Image.open(os.path.join(directory, file)) as img:
                 data = np.array(img)
-        except PIL.UnidentifiedImageError:
+        except:
             os.remove(os.path.join(directory, file))
         
 
