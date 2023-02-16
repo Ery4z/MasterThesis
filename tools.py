@@ -1149,8 +1149,8 @@ if __name__ == "__main__":
     # test3()
     # test4()
     # analyse()
-    # search_optimal_th()
-    load_plot_search_optimal_threshold()
+    search_optimal_th()
+    # load_plot_search_optimal_threshold()
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=3000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000)
     
