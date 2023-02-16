@@ -16,6 +16,7 @@ import time
 from multiprocessing import Pool, cpu_count
 from multiprocessing.managers import BaseManager
 from PIL import Image
+import PIL
 from tqdm import tqdm
 
 
