@@ -609,8 +609,8 @@ class DataWrapper:
 
             picture_path = os.path.join(self.picture_dir, picture_name)
 
-            
-            data = np.array(Image.open(picture_path))
+            with Image.open(picture_path) as img:
+                data = np.array(img)
             tmp_data_list.append(data)
     
         self.picture_data = np.array(tmp_data_list)
