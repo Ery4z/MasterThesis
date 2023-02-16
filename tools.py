@@ -899,6 +899,7 @@ def analyse_dataset(BATCH_SIZE = 1000,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY 
     energy_heatmap = []
     pos_list = []
     timestamps_to_load_total = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
+    rd.suffle(timestamps_to_load_total)
     timestamps_to_load_total = timestamps_to_load_total[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load_total))]
     for batch_index in tqdm(range(0,math.ceil(len(timestamps_to_load_total)/BATCH_SIZE)),desc="Batch"):
     

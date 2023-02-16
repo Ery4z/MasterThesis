@@ -66,8 +66,12 @@ def align_seq(path_source_radar, path_source_camera, path_dest_radar, path_dest_
     progress_bar = ProgressBar(times_radar.shape[0], "Align Sequences", max_upd_rate=50)
     i_camera = 1
     for i_radar in range(times_radar.shape[0]):
-        while times_camera[i_camera] <= times_radar[i_radar]:
-            i_camera += 1
+        try:
+            while times_camera[i_camera] <= times_radar[i_radar]:
+                i_camera += 1
+        except IndexError:
+            os.remove(path_source_radar + "{:018.6f}".format(times_radar[i_radar]) + ".raw")
+            continue
         choice = compare(times_camera[i_camera-1], times_camera[i_camera], times_radar[i_radar])
         source_file = os.path.join(path_source_camera, "{:018.6f}".format(choice)+ ".jpeg")
         dest_file = os.path.join(path_dest_camera, "{:018.6f}".format(times_radar[i_radar])+ ".jpeg")
