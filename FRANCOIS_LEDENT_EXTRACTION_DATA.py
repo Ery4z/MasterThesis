@@ -70,7 +70,7 @@ def align_seq(path_source_radar, path_source_camera, path_dest_radar, path_dest_
             while times_camera[i_camera] <= times_radar[i_radar]:
                 i_camera += 1
         except IndexError:
-            os.remove(os.path.join(path_source_radar , "{:018.6f}".format(times_radar[i_radar]) + ".raw"))
+            os.remove(os.path.join(path_source_radar , str(times_radar) + ".raw"))
             continue
         choice = compare(times_camera[i_camera-1], times_camera[i_camera], times_radar[i_radar])
         source_file = os.path.join(path_source_camera, "{:018.6f}".format(choice)+ ".jpeg")
@@ -220,5 +220,5 @@ if __name__ == "__main__":
     path_dest_radar = os.path.join(path,"graphes")
     path_dest_camera = os.path.join(path,"images")
 
-    # align_seq(path_source_radar, path_source_camera, path_dest_radar, path_dest_camera)
+    align_seq(path_source_radar, path_source_camera, path_dest_radar, path_dest_camera)
     get_graphs(path_source_radar, path_dest_radar,True)
