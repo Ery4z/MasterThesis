@@ -16,6 +16,7 @@ import time
 from multiprocessing import Pool, cpu_count
 from multiprocessing.managers import BaseManager
 from PIL import Image
+from tqdm import tqdm
 
 
 NCPU = cpu_count()-1
@@ -24,7 +25,7 @@ SAVE_DOPPLER = True
 SAVE_MAGN = True
 
 def verify_and_delete_images_in_dir(directory):
-    for file in os.listdir(directory):
+    for file in tqdm(os.listdir(directory),desc="Verifying images",unit="images",leave=False):
         data = None
         try:
             with Image.open(os.path.join(directory, file)) as img:
