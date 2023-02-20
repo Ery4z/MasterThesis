@@ -1,0 +1,15 @@
+Analysis result for threshold 50000 using 1000 files:
+	mean energy: 18314155748965.414
+	mean missmatch: -0.164
+	error count: 285 / 1000 (28.499999999999996%)
+	loss: 0.442
+	for datapoint having one vehicle (according to yolo):
+		mean missmatch: -0.3382352941176471
+		mean energy: 15259744483178.783
+		loss: 0.4852941176470588
+		error count: 126 / 272 (46.32352941176471%)
+	for datapoint having no vehicle (according to yolo):
+		mean missmatch: 0.10714285714285714
+		mean energy: 19956278961872.945
+		loss: 0.12012987012987013
+		error count: 62 / 616 (10.064935064935066%)

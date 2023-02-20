@@ -21,7 +21,7 @@ import cv2
 import math
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
-CAMERA_PARAM = {'focal_length':5695.8, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
+CAMERA_PARAM = {'focal_length_x':2637,'focal_length_y':5695, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
 FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 def calculate_energy(data):
     """Calculate the energy of an array. Useful to know if the data is meaningful
@@ -91,7 +91,7 @@ def plot_3d_world_pos(pos_list,camera_parameters):
         ax.add_collection3d(Poly3DCollection(verts, facecolors='cyan', linewidths=1, edgecolors='r', alpha=.25))
 
         camera_center = np.array([-0.3, 0, 0])
-        fovY = camera_parameters['fov']
+        fovY = camera_parameters['fov']*math.pi/180
         image_size = camera_parameters['image_size']
         fovZ = fovY * image_size[1] / image_size[0]
         distanceX = 70
@@ -100,6 +100,7 @@ def plot_3d_world_pos(pos_list,camera_parameters):
                     camera_center+np.array([70,distanceX*math.tan(fovY/2),10]),
                     camera_center+np.array([70,-distanceX*math.tan(fovY/2),10]),
                     camera_center+np.array([70,-distanceX*math.tan(fovY/2),-1])]
+        print(point_FOV)
         lines = [ [camera_center,point_FOV[0]], [camera_center,point_FOV[1]], [camera_center,point_FOV[2]], [camera_center,point_FOV[3]]]
         for l in lines:
             ax.plot3D(*zip(*l), color='r')
@@ -134,7 +135,7 @@ def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,came
     Returns:
         [3]float: 3d pos of the item
     """
-    fx, fy = camera_parameters['focal_length'], camera_parameters['focal_length']
+    fx, fy = camera_parameters['focal_length_y'], camera_parameters['focal_length_y']
     cx = camera_parameters['principal_point'][0]
     cy = camera_parameters['principal_point'][1]
     
@@ -150,7 +151,7 @@ def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,came
     yaw = math.atan2(x-cx, fx)
     pitch = math.atan2(y-cy, fy)
     
-    absolute_position = [distance * math.cos(pitch) * math.cos(yaw), -distance * math.cos(pitch) * math.sin(yaw), distance * math.sin(pitch)]
+    absolute_position = [distance * math.cos(pitch) * math.cos(yaw), -distance * math.sin(yaw), distance * math.sin(pitch)]
     
     return absolute_position
     
@@ -269,8 +270,7 @@ def slog(data):
     Returns:
         np.array: array
     """
-    out = np.where(data > 0) 
-    return np.nan_to_num(np.log(np.abs(data[out]))*np.sign(data[out]))
+    return np.nan_to_num(np.log(np.abs(data))*np.sign(data))
 
 
 def triangle_kernel(kerlen):
@@ -744,16 +744,20 @@ class DataWrapper:
         plt.title(self.timestamps_to_load[index])
         
         plt.show()
-    def plot_radar_wrapper(self,data):
+    def plot_radar_wrapper(self,data,negative_heatmap=False):
         """Utility function to wrap a heatmap plot.
 
         Args:
             data (np.array): heatmap data
         """
-        plt.imshow(data,cmap=self.color_map,extent=self.radar_parameters["speed"]+self.radar_parameters["distance"],aspect='auto')
+        if negative_heatmap:
+            cmap, norm = self.get_color_map(data)
+            plt.imshow(data,cmap=cmap,norm=norm,extent=self.radar_parameters["speed"]+self.radar_parameters["distance"],aspect='auto')
+        else:
+            plt.imshow(data,cmap=self.color_map,extent=self.radar_parameters["speed"]+self.radar_parameters["distance"],aspect='auto')
         plt.xlabel("Speed (km/h)")
         plt.ylabel("Distance (m)")
-        plt.grid(color="orange",linestyle="--",linewidth=0.5)
+        plt.grid(color="green",linestyle="--",linewidth=0.5)
         
         
     def plot_CFAR(self,index,annotated=False):
@@ -785,6 +789,40 @@ class DataWrapper:
             plt.imshow(self.picture_data_annotated[index])
         else:
             plt.imshow(self.picture_data[index],cmap=self.color_map)
+        plt.title(self.timestamps_to_load[index])
+        
+        plt.show()
+
+    def plot_comparison_filter(self,index):
+        """Utility function to plot the raw heatmap, the filtered heatmap and the picture.
+
+        Args:
+            index (int): index of the couple
+        """
+        plt.figure()
+        plt.subplot(2,3,1)
+        data = self.heatmap_data[index]
+        filtred_data = self.filter(data)
+        
+
+        
+        self.plot_radar_wrapper(data,negative_heatmap=False)
+        plt.colorbar()
+        plt.title("Heatmap raw")
+        
+        plt.subplot(2,3,4)
+        log_data = slog(data)
+        self.plot_radar_wrapper(log_data,negative_heatmap=False)
+        plt.colorbar()
+        plt.title("Heatmap raw log")
+        
+        plt.subplot(2,3,2)
+        self.plot_radar_wrapper(filtred_data)
+        plt.title("Heatmap filtered")
+
+        plt.subplot(2,3,3)
+        
+        plt.imshow(self.picture_data[index],cmap=self.color_map)
         plt.title(self.timestamps_to_load[index])
         
         plt.show()
@@ -861,10 +899,11 @@ def test1 ():
     
     for i in random_sample:
         # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
-        dataWrapper.pipeline_process(i)
-        ana = dataWrapper.analyse_couple(i,plot=True)
-        res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
-        print(res)
+        # dataWrapper.pipeline_process(i)
+        # ana = dataWrapper.analyse_couple(i,plot=True)
+        # res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
+        # print(res)
+        dataWrapper.plot_comparison_filter(i)
         # dataWrapper.plot_CFAR(i)
 
 def test2():
@@ -885,7 +924,6 @@ def analyse_dataset(BATCH_SIZE = 1000,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY 
     
     BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
     MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
-    
     
 
     heatmap_directory = os.path.join(FILE_DIRECTORY, "data","graphes")
@@ -1077,25 +1115,26 @@ def search_optimal_th():
         pickle.dump(np.array(error_count_list_0_vehicle),f)
     
 def load_plot_search_optimal_threshold():
-    FILE_COUNT_TO_LOAD = 3000
-    search_space = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_threshold.pkl"),"rb"))
-    loss_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_all_sample.pkl"),"rb"))
-    error_count_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_all_sample.pkl"),"rb"))
-    loss_list_1_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_1_vehicle.pkl"),"rb"))
-    error_count_list_1_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_1_vehicle.pkl"),"rb"))
-    loss_list_0_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_0_vehicle.pkl"),"rb"))
-    error_count_list_0_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_0_vehicle.pkl"),"rb"))
+    FILE_COUNT_TO_LOAD = 10000
+    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis3_10000")
+    search_space = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_threshold.pkl"),"rb"))
+    loss_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_all_sample.pkl"),"rb"))
+    error_count_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_all_sample.pkl"),"rb"))
+    loss_list_1_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_1_vehicle.pkl"),"rb"))
+    error_count_list_1_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_1_vehicle.pkl"),"rb"))
+    loss_list_0_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_0_vehicle.pkl"),"rb"))
+    error_count_list_0_vehicle = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_0_vehicle.pkl"),"rb"))
     
     plt.figure()
-    # plt.subplot(211)
-    # plt.plot(search_space,loss_list_all_sample)
-    # plt.plot(search_space,loss_list_1_vehicle)
-    # plt.plot(search_space,loss_list_0_vehicle)
-    # plt.grid()
-    # plt.title("Loss")
-    # plt.xlabel("Threshold value")
-    # plt.ylabel("Loss")
-    # plt.xscale("log")
+    plt.subplot(211)
+    plt.plot(search_space,loss_list_all_sample)
+    plt.plot(search_space,loss_list_1_vehicle)
+    plt.plot(search_space,loss_list_0_vehicle)
+    plt.grid()
+    plt.title("Loss")
+    plt.xlabel("Threshold value")
+    plt.ylabel("Loss")
+    plt.xscale("log")
     
     
     plt.subplot(212)
@@ -1114,7 +1153,7 @@ def load_plot_search_optimal_threshold():
     
     
 def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
-    pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image = analyse_dataset(save=True,FILE_COUNT_TO_LOAD=3000,cfar_threshold=210000)
+    pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image = analyse_dataset(save=True,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=210000)
     
     loss = np.mean((missmatch_count_heatmap_image)**2)
     error_count = np.sum(missmatch_count_heatmap_image != 0)
@@ -1144,13 +1183,13 @@ def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
     plot_analysis_result(detected_vehicle_heatmap, detected_vehicle_image, energy_heatmap, pos_list,missmatch_count_heatmap_image,CAMERA_PARAM )
 
 if __name__ == "__main__":
-    # test1()
+    test1()
     # test2()
     # test3()
     # test4()
     # analyse()
-    search_optimal_th()
+    # search_optimal_th()
     # load_plot_search_optimal_threshold()
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=3000,cfar_threshold=210000)
-    # rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000)
+    # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
     
