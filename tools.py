@@ -594,7 +594,10 @@ class DataWrapper:
 
             
             data = self.load_file(heatmap_path)
-            tmp_data_list.append(np.abs(data))
+            data = np.abs(data)
+            # data[data>10**7] = 0
+            
+            tmp_data_list.append(data)
         
         self.heatmap_data = np.array(tmp_data_list)
     
@@ -691,10 +694,11 @@ class DataWrapper:
         if self.background_data is None : return
 
         plt.figure()
-        if logarithmic:
-            plt.imshow(slog(self.background_data),cmap="gray")
-        else:
-            plt.imshow(np.abs(self.background_data),cmap="gray")
+        plt.subplot(121)
+        self.plot_radar_wrapper(self.background_data)
+        plt.subplot(122)
+        self.plot_radar_wrapper(slog(self.background_data),negative_heatmap=True)
+        
         plt.show()
     
     def plot_mean(self,logarithmic=True):
@@ -801,18 +805,32 @@ class DataWrapper:
         """
         plt.figure()
         plt.subplot(2,3,1)
+        
+        
+        
         data = self.heatmap_data[index]
-        filtred_data = self.filter(data)
+        data = data - self.background_data
+        data = data - self.heatmap_mean
+
+        data = np.maximum(data, 0)
+        
+        
+        
+        filtred_data = self.filter(data.copy())
         
 
         
-        self.plot_radar_wrapper(data,negative_heatmap=False)
+        # self.plot_radar_wrapper(data,negative_heatmap=True)
+        plt.imshow(data)
         plt.colorbar()
         plt.title("Heatmap raw")
         
         plt.subplot(2,3,4)
-        log_data = slog(data)
-        self.plot_radar_wrapper(log_data,negative_heatmap=False)
+        log_data = data.copy()
+        log_data = slog(log_data)
+        self.plot_radar_wrapper(log_data,negative_heatmap=True)
+        # plt.imshow(log_data)
+        
         plt.colorbar()
         plt.title("Heatmap raw log")
         
@@ -872,6 +890,49 @@ def test1 ():
     
     BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
     MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
+    NEW_BACKGROUND = os.path.join(FILE_DIRECTORY,"new_background.doppler")
+    
+    
+
+    heatmap_directory = os.path.join(FILE_DIRECTORY, "data","graphes")
+    picture_directory = os.path.join(FILE_DIRECTORY, "data","images")
+    
+    
+
+    timestamps_to_load = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
+    timestamps_to_load = timestamps_to_load[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load))]
+
+    
+
+    
+    dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="")
+    
+    dataWrapper.set_background_data(NEW_BACKGROUND)
+    dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
+    
+    # dataWrapper.remove_background_data()
+
+    
+    
+    random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),10)
+    dataWrapper.plot_background()
+    
+    for i in random_sample:
+        # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
+        # dataWrapper.pipeline_process(i)
+        # ana = dataWrapper.analyse_couple(i,plot=True)
+        # res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
+        # print(res)
+        dataWrapper.plot_comparison_filter(i)
+        # dataWrapper.plot_CFAR(i)
+
+
+def test1bis ():
+    FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    FILE_COUNT_TO_LOAD = 100
+    
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
+    MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
     
     
 
@@ -895,7 +956,8 @@ def test1 ():
 
     
     
-    random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),10)
+    random_sample = [0,3,6]#
+    heatmap_bg = np.zeros((256,256))
     
     for i in random_sample:
         # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
@@ -903,8 +965,14 @@ def test1 ():
         # ana = dataWrapper.analyse_couple(i,plot=True)
         # res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
         # print(res)
-        dataWrapper.plot_comparison_filter(i)
+        # dataWrapper.plot_comparison_filter(i)
+        
         # dataWrapper.plot_CFAR(i)
+        heatmap_bg += dataWrapper.heatmap_data[i]
+    
+    path = os.path.join(FILE_DIRECTORY,"new_background.doppler")
+    dataWrapper.save_mean_heatmap_data(path)
+
 
 def test2():
     analyse = {'timestamp': '1657880853.943706', 'heatmap_energy': 6732783934474.394, 'heatmap_info': [{'distance': 53.8671875, 'speed': 8.247187500000003}], 'raw_heatmap_info': [[197, 166]], 'image_info': [{'bbox': [538, 576, 804, 749], 'x': 671, 'y': 662, 'class': 'car', 'confidence': 0.8863056302070618}]}
@@ -1184,12 +1252,13 @@ def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
 
 if __name__ == "__main__":
     test1()
+    # test1bis()
     # test2()
     # test3()
     # test4()
     # analyse()
     # search_optimal_th()
     # load_plot_search_optimal_threshold()
-    # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=3000,cfar_threshold=210000)
+    # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=1000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
     
