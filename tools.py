@@ -886,11 +886,12 @@ class DataWrapper:
 
 def test1 ():
     FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-    FILE_COUNT_TO_LOAD = 100
+    FILE_COUNT_TO_LOAD = 1000
+    cfar_threshold = 50000
     
     BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
     MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
-    NEW_BACKGROUND = os.path.join(FILE_DIRECTORY,"new_background.doppler")
+    NEW_BACKGROUND = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
     
     
 
@@ -914,8 +915,12 @@ def test1 ():
 
     
     
-    random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),10)
+    random_sample = range(len(timestamps_to_load))#rd.sample(range(FILE_COUNT_TO_LOAD),100)
     dataWrapper.plot_background()
+    
+    bg = np.zeros((256,256))
+    bg_list = []
+    nb_bg = 0
     
     for i in random_sample:
         # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
@@ -923,9 +928,24 @@ def test1 ():
         # ana = dataWrapper.analyse_couple(i,plot=True)
         # res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
         # print(res)
-        dataWrapper.plot_comparison_filter(i)
+        result_analysis = dataWrapper.analyse_couple(i, plot=False, cfar_threshold=cfar_threshold)
+        
+        # Check if the number of detected object match the number of object in the picture
+        detected_heatmap_count = len(result_analysis.heatmap_info)
+        detected_image_count = len(result_analysis.image_info)
+        
+        print("Detected image object: {} | ".format(detected_image_count)+"Detected heatmap object: {}".format(detected_heatmap_count))
+        
+        
+        # dataWrapper.plot_comparison_filter(i)
+        if detected_image_count == 0:
+            bg_list.append(dataWrapper.heatmap_data[i])
+            
+        
         # dataWrapper.plot_CFAR(i)
 
+    
+    
 
 def test1bis ():
     FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
