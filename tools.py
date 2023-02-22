@@ -249,6 +249,21 @@ kernelH[:l-k, l-m:l+m+1] = val
 kernelB = np.zeros((2*l+1, 2*l+1))
 kernelB[l+k+1:, l-m:l+m+1] = val
 
+def corr_kernel(m, n, sigma):
+    kernel = np.zeros((2*n+1, 2*n+1))
+    kernel[n-m:n+m+1, n-m:n+m+1] = get_gaussian_kernel(sigma, m*2+1, divX=3)
+    kernel0 = (kernel == 0)
+    kernel[kernel0] = -1 / np.sum(kernel0)
+    return kernel
+
+def get_gaussian_kernel(sigma, n, divX=1, divY=1):
+    indices = np.linspace(-n/2, n/2, n)
+    [X, Y] = np.meshgrid(indices, indices)
+    X, Y = X/divX, Y/divY
+    h = np.exp(-(X**2+Y**2)/(2.0*(sigma)**2))
+    h /= h.sum()
+    return h
+
 # from LELEC2885 - Image Proc. & Comp. Vision
 def fast_convolution(image, kernel):
     kernel_resized = resize_and_fix_origin(kernel, image.shape)
@@ -273,7 +288,7 @@ def slog(data):
     return np.nan_to_num(np.log(np.abs(data))*np.sign(data))
 
 
-def triangle_kernel(kerlen):
+def triangle_kernel(kerlenx, kerleny):
     """Generate a 2D triangle kernel given the length
 
     Args:
@@ -282,9 +297,9 @@ def triangle_kernel(kerlen):
     Returns:
         np.array([kerlen]float): Kernel
     """
-    r = np.arange(kerlen)
-    kernel1d = (kerlen + 1 - np.abs(r - r[::-1])) / 2
-    kernel2d = np.outer(kernel1d, kernel1d)
+    r = np.arange(kerlenx)
+    kernel1d = (kerlenx + 1 - np.abs(r - r[::-1])) / 2
+    kernel2d = np.expand_dims(kernel1d, axis=0)
     kernel2d /= kernel2d.sum()
     return kernel2d
     
@@ -363,7 +378,8 @@ class DataWrapper:
 
         data = np.maximum(data, 0)
         
-        kernel = triangle_kernel(3)
+        # kernel = triangle_kernel(3,1)
+        kernel = corr_kernel(15,15,0.5)
         filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
         
         
@@ -915,7 +931,7 @@ def test1 ():
 
     
     
-    random_sample = range(len(timestamps_to_load))#rd.sample(range(FILE_COUNT_TO_LOAD),100)
+    random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),10)
     dataWrapper.plot_background()
     
     bg = np.zeros((256,256))
@@ -928,22 +944,26 @@ def test1 ():
         # ana = dataWrapper.analyse_couple(i,plot=True)
         # res = from_multimodal_analysis_result_to_3d(ana,dataWrapper.camera_parameters)
         # print(res)
-        result_analysis = dataWrapper.analyse_couple(i, plot=False, cfar_threshold=cfar_threshold)
+        # result_analysis = dataWrapper.analyse_couple(i, plot=False, cfar_threshold=cfar_threshold)
         
-        # Check if the number of detected object match the number of object in the picture
-        detected_heatmap_count = len(result_analysis.heatmap_info)
-        detected_image_count = len(result_analysis.image_info)
+        # # Check if the number of detected object match the number of object in the picture
+        # detected_heatmap_count = len(result_analysis.heatmap_info)
+        # detected_image_count = len(result_analysis.image_info)
         
-        print("Detected image object: {} | ".format(detected_image_count)+"Detected heatmap object: {}".format(detected_heatmap_count))
+        # print("Detected image object: {} | ".format(detected_image_count)+"Detected heatmap object: {}".format(detected_heatmap_count))
         
         
-        # dataWrapper.plot_comparison_filter(i)
-        if detected_image_count == 0:
-            bg_list.append(dataWrapper.heatmap_data[i])
+        dataWrapper.plot_comparison_filter(i)
+        # if detected_image_count == 0:
+        #     bg_list.append(dataWrapper.heatmap_data[i])
             
         
         # dataWrapper.plot_CFAR(i)
 
+    # bg = np.mean(np.array(bg_list),axis=0)
+    # path = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
+    # with open(path,"wb") as f:
+    #     pickle.dump(bg,f)
     
     
 
@@ -1128,7 +1148,7 @@ def test5():
 
 def search_optimal_th():
     TH = 30000
-    FILE_COUNT_TO_LOAD=3000
+    FILE_COUNT_TO_LOAD=10000
     FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
     loss_list_all_sample = []
     error_count_list_all_sample = []
@@ -1271,13 +1291,13 @@ def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
     plot_analysis_result(detected_vehicle_heatmap, detected_vehicle_image, energy_heatmap, pos_list,missmatch_count_heatmap_image,CAMERA_PARAM )
 
 if __name__ == "__main__":
-    test1()
+    # test1()
     # test1bis()
     # test2()
     # test3()
     # test4()
     # analyse()
-    # search_optimal_th()
+    search_optimal_th()
     # load_plot_search_optimal_threshold()
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=1000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
