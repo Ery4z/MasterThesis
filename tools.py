@@ -380,7 +380,7 @@ class DataWrapper:
         data = np.maximum(data, 0)
         
         # kernel = triangle_kernel(3,1)
-        kernel = corr_kernel(15,15,0.5)
+        kernel = corr_kernel(10,10,0.5)
         filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
         
         
