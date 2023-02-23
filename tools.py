@@ -1028,7 +1028,7 @@ def test2():
     res = from_multimodal_analysis_result_to_3d(struct_analyse,camera_parameters)
     print(res)
     
-def analyse_dataset(BATCH_SIZE = 1000,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=30,save=True):
+def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=30,save=True):
 
     
     BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
