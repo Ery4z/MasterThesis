@@ -252,7 +252,8 @@ kernelB[l+k+1:, l-m:l+m+1] = val
 def corr_kernel(m, n, sigma):
     kernel = np.zeros((2*n+1, 2*n+1))
     kernel[n-m:n+m+1, n-m:n+m+1] = get_gaussian_kernel(sigma, m*2+1, divX=3)
-    kernel0 = (kernel == 0)
+    seuil = 1e-10
+    kernel0 = (kernel < seuil)
     kernel[kernel0] = -1 / np.sum(kernel0)
     return kernel
 
