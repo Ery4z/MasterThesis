@@ -1030,7 +1030,7 @@ def test2():
 def analyse_dataset(BATCH_SIZE = 1000,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=30,save=True):
 
     
-    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
     MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
     
 
@@ -1224,7 +1224,7 @@ def search_optimal_th():
     
 def load_plot_search_optimal_threshold():
     FILE_COUNT_TO_LOAD = 10000
-    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis3_10000")
+    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis4_10000_new")
     search_space = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_threshold.pkl"),"rb"))
     loss_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_all_sample.pkl"),"rb"))
     error_count_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_all_sample.pkl"),"rb"))
@@ -1297,8 +1297,8 @@ if __name__ == "__main__":
     # test3()
     # test4()
     # analyse()
-    search_optimal_th()
-    # load_plot_search_optimal_threshold()
+    # search_optimal_th()
+    load_plot_search_optimal_threshold()
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=1000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
     
