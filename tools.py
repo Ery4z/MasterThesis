@@ -379,12 +379,12 @@ class DataWrapper:
 
         data = np.maximum(data, 0)
         
-        kernel = triangle_kernel(3,3)
+        # kernel = triangle_kernel(3,3)
         # kernel = corr_kernel(10,10,0.5)
-        filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
+        # filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
         
         
-        data = scipy.signal.convolve2d(data, kernel, mode='same')
+        # data = scipy.signal.convolve2d(data, kernel, mode='same')
         
         # data = data - filtred_bg
         return data
@@ -1225,7 +1225,7 @@ def search_optimal_th():
     
 def load_plot_search_optimal_threshold():
     FILE_COUNT_TO_LOAD = 10000
-    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis4_10000_new")
+    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis5_10000_triangle_new")
     search_space = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_threshold.pkl"),"rb"))
     loss_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_all_sample.pkl"),"rb"))
     error_count_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_all_sample.pkl"),"rb"))
@@ -1298,8 +1298,8 @@ if __name__ == "__main__":
     # test3()
     # test4()
     # analyse()
-    search_optimal_th()
-    # load_plot_search_optimal_threshold()
+    # search_optimal_th()
+    load_plot_search_optimal_threshold()
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=1000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
     
