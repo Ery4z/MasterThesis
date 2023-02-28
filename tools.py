@@ -21,6 +21,62 @@ import cv2
 import math
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
+
+
+##################################### UTILITY 3d Polygon fucntion
+
+#determinant of matrix a
+def det(a):
+    return a[0][0]*a[1][1]*a[2][2] + a[0][1]*a[1][2]*a[2][0] + a[0][2]*a[1][0]*a[2][1] - a[0][2]*a[1][1]*a[2][0] - a[0][1]*a[1][0]*a[2][2] - a[0][0]*a[1][2]*a[2][1]
+
+#unit normal vector of plane defined by points a, b, and c
+def unit_normal(a, b, c):
+    x = det([[1,a[1],a[2]],
+             [1,b[1],b[2]],
+             [1,c[1],c[2]]])
+    y = det([[a[0],1,a[2]],
+             [b[0],1,b[2]],
+             [c[0],1,c[2]]])
+    z = det([[a[0],a[1],1],
+             [b[0],b[1],1],
+             [c[0],c[1],1]])
+    magnitude = (x**2 + y**2 + z**2)**.5
+    return (x/magnitude, y/magnitude, z/magnitude)
+
+#dot product of vectors a and b
+def dot(a, b):
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+
+#cross product of vectors a and b
+def cross(a, b):
+    x = a[1] * b[2] - a[2] * b[1]
+    y = a[2] * b[0] - a[0] * b[2]
+    z = a[0] * b[1] - a[1] * b[0]
+    return (x, y, z)
+
+#area of polygon poly
+def area(poly):
+    if len(poly) < 3: # not a plane - no area
+        return 0
+
+    total = [0, 0, 0]
+    for i in range(len(poly)):
+        vi1 = poly[i]
+        if i is len(poly)-1:
+            vi2 = poly[0]
+        else:
+            vi2 = poly[i+1]
+        prod = cross(vi1, vi2)
+        total[0] += prod[0]
+        total[1] += prod[1]
+        total[2] += prod[2]
+    result = dot(total, unit_normal(poly[0], poly[1], poly[2]))
+    return abs(result/2)
+
+
+#####################################
+
+
 CAMERA_PARAM = {'focal_length_x':2637,'focal_length_y':5695, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
 FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 def calculate_energy(data):
@@ -42,6 +98,9 @@ def load_analysis_result(path:str):
     missmatch = pickle.load(open(path + "/count_missmatch.pkl", "rb"))
     
     return heatmap_data, image_data, energy, pos_list ,missmatch
+
+
+
 
 def plot_analysis_result(heatmap_data, image_data, energy, pos_list,missmatch, camera_parameters):
     plot_3d_world_pos(pos_list,camera_parameters)
@@ -76,7 +135,28 @@ class MultimodalAnalysisResult:
         self.heatmap_info = heatmap_info
         self.raw_heatmap_info = raw_heatmap_info
         self.image_info = image_info
+    
+    def set_caracteristic_length(self,caracteristic_length):
+        self.caracteristic_length = caracteristic_length
+        
+    def set_bbox_3d(self,points):
+        self.bbox_3d = points
 
+def get_caracteristic_length(analysis_result: MultimodalAnalysisResult):
+    """Get the caracteristic length of the detected vehicle
+
+    Args:
+        analysis_result (MultiModalAnalysisResult): Analysis result
+
+    Returns:
+        float: Caracteristic length of the heatmap
+    """
+    distance = analysis_result.heatmap_info[0]["distance"]
+    # area = (analysis_result.image_info[0]["bbox"][2] - analysis_result.image_info[0]["bbox"][0]) * (analysis_result.image_info[0]["bbox"][3] - analysis_result.image_info[0]["bbox"][1])
+    area_vehicle = area(analysis_result.bbox_3d)
+    return np.sqrt(area_vehicle)
+    
+    
 
 def plot_3d_world_pos(pos_list,camera_parameters):
     def plot_camera(ax,camera_parameters):
@@ -135,25 +215,38 @@ def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,came
     Returns:
         [3]float: 3d pos of the item
     """
-    fx, fy = camera_parameters['focal_length_y'], camera_parameters['focal_length_y']
-    cx = camera_parameters['principal_point'][0]
-    cy = camera_parameters['principal_point'][1]
-    
-    image_size = camera_parameters['image_size']
-    fovX = camera_parameters['fov']
-    fovY = fovX * image_size[1] / image_size[0]
-    
     
     distance = analysis.heatmap_info[0]["distance"]
-    x = analysis.image_info[0]["x"]
-    y = analysis.image_info[0]["y"]
     
-    yaw = math.atan2(x-cx, fx)
-    pitch = math.atan2(y-cy, fy)
+    def from_point_to_3d(x,y,distance,camera_parameters):
+        fx, fy = camera_parameters['focal_length_y'], camera_parameters['focal_length_y']
+        cx = camera_parameters['principal_point'][0]
+        cy = camera_parameters['principal_point'][1]
+        
+            
+        
+        
+        image_size = camera_parameters['image_size']
+        fovX = camera_parameters['fov']
+        fovY = fovX * image_size[1] / image_size[0]
+
+        
+        yaw = math.atan2(x-cx, fx)
+        pitch = math.atan2(y-cy, fy)
+        
+        absolute_position = [distance * math.cos(pitch) * math.cos(yaw), -distance * math.sin(yaw), distance * math.sin(pitch)]
+        return absolute_position
     
-    absolute_position = [distance * math.cos(pitch) * math.cos(yaw), -distance * math.sin(yaw), distance * math.sin(pitch)]
+    absolute_position = from_point_to_3d(analysis.image_info[0]["x"],analysis.image_info[0]["y"],distance,camera_parameters)
+    bb_box_3d_pos = []
+    bb_box = analysis.image_info[0]["bbox"]
+    bb_box_points = [[bb_box[0],bb_box[1]],[bb_box[0],bb_box[3]],[bb_box[2],bb_box[3]],[bb_box[2],bb_box[1]]]
     
-    return absolute_position
+    for points in bb_box_points:
+        bb_box_3d_pos.append(from_point_to_3d(points[0],points[1],distance,camera_parameters))
+    
+    
+    return absolute_position,bb_box_3d_pos
     
 
 
@@ -380,8 +473,8 @@ class DataWrapper:
         data = np.maximum(data, 0)
         
         # kernel = triangle_kernel(3,3)
-        # kernel = corr_kernel(10,10,0.5)
-        # filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
+        kernel = corr_kernel(11,11,0.5)
+        filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
         
         
         # data = scipy.signal.convolve2d(data, kernel, mode='same')
@@ -516,10 +609,10 @@ class DataWrapper:
         analyse["image_info"] = image_info
         
         # Get the image with bounding boxes
+        self.add_annotation(index,image_info)
         if plot:
             # Extract the image to a numpy array
             print(analyse)
-            self.add_annotation(index,image_info)
             # bb_array = np.array(Image.open("tmp.jpeg"))
             # self.picture_data_annotated[index] = bb_array
             self.plot_CFAR(index, annotated=True)
@@ -862,7 +955,7 @@ class DataWrapper:
         
         plt.show()
 
-    def pipeline_process(self,index,debug=False,cfar_threshold=30):
+    def pipeline_process(self,index,debug=False,cfar_threshold=30,length_threshold=1.1):
         result_analysis = self.analyse_couple(index, plot=False, cfar_threshold=cfar_threshold)
         
         # Check if the number of detected object match the number of object in the picture
@@ -890,7 +983,14 @@ class DataWrapper:
         if detected_heatmap_count != 1:
             return None,result_analysis
         
-        pos_3d = from_multimodal_analysis_result_to_3d(result_analysis,self.camera_parameters)
+        pos_3d,bb_box_3d_pos = from_multimodal_analysis_result_to_3d(result_analysis,self.camera_parameters)
+        result_analysis.set_bbox_3d(bb_box_3d_pos)
+        # Check if the detected heatmap object is coherent with the picture object
+        caracteristic_lenght = get_caracteristic_length(result_analysis)
+        result_analysis.set_caracteristic_length(caracteristic_lenght)
+        
+        if caracteristic_lenght < length_threshold:
+            return None,result_analysis
         
         
         
@@ -932,7 +1032,7 @@ def test1 ():
 
     
     
-    random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),10)
+    random_sample = range(10)
     dataWrapper.plot_background()
     
     bg = np.zeros((256,256))
@@ -1025,7 +1125,7 @@ def test2():
     
     camera_parameters = {'focal_length':5695.8, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
     
-    res = from_multimodal_analysis_result_to_3d(struct_analyse,camera_parameters)
+    res,bb_box_3d_pos = from_multimodal_analysis_result_to_3d(struct_analyse,camera_parameters)
     print(res)
     
 def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=30,save=True):
@@ -1039,6 +1139,7 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
     picture_directory = os.path.join(FILE_DIRECTORY, "data","images")
     
     count_error = 0 
+    ok_1_vehicle = 0
     detected_vehicle_heatmap = []
     detected_vehicle_image = []
     missmatch_count_heatmap_image = []
@@ -1073,6 +1174,7 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
             res_analyses.append(res_ana)
             if res is not None:
                 pos_list.append(res)
+                ok_1_vehicle += 1
                 
         
         # Some metrics on the quality of the detection
@@ -1085,6 +1187,8 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
             missmatch_count_heatmap_image.append(len(ana.heatmap_info) - len(ana.image_info))
             if len(ana.heatmap_info) != len(ana.image_info):
                 count_error += 1
+            
+                
     
     
     pos_list = np.array(pos_list)
@@ -1125,7 +1229,7 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
         with open(os.path.join(ANA_DIRECTORY,"README.md"),"w") as f:
             f.write(f"Number of error : {count_error} / {len(timestamps_to_load_total)}")
     
-    return pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image
+    return pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle
 
 def read_analysis():
     PATH_ANALYSIS = os.path.join(os.path.dirname(os.path.realpath(__file__)),"dataset_analysis_save","analysis_3")
@@ -1162,7 +1266,7 @@ def search_optimal_th():
     
     search_space = np.logspace(3,6,num=100)
     for th in search_space:
-        pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image = analyse_dataset(save=False,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=th)
+        pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle = analyse_dataset(save=False,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=th)
         
         loss_all_sample = np.mean((missmatch_count_heatmap_image)**2)
         error_count_all_sample = np.sum(missmatch_count_heatmap_image != 0)
@@ -1225,7 +1329,7 @@ def search_optimal_th():
     
 def load_plot_search_optimal_threshold():
     FILE_COUNT_TO_LOAD = 10000
-    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis5_10000_triangle_new")
+    FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis6_10000_raw")
     search_space = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_threshold.pkl"),"rb"))
     loss_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_all_sample.pkl"),"rb"))
     error_count_list_all_sample = pickle.load(open(os.path.join(FILE_DIRECTORY_ANALYSE,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_all_sample.pkl"),"rb"))
@@ -1262,7 +1366,7 @@ def load_plot_search_optimal_threshold():
     
     
 def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
-    pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image = analyse_dataset(save=True,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=210000)
+    pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle = analyse_dataset(save=True,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=210000)
     
     loss = np.mean((missmatch_count_heatmap_image)**2)
     error_count = np.sum(missmatch_count_heatmap_image != 0)
@@ -1291,6 +1395,136 @@ def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
         
     plot_analysis_result(detected_vehicle_heatmap, detected_vehicle_image, energy_heatmap, pos_list,missmatch_count_heatmap_image,CAMERA_PARAM )
 
+
+def plot_carcteristic_lenght():
+    FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    FILE_COUNT_TO_LOAD = 1000
+    
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
+    MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
+    NEW_BACKGROUND = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
+    
+    
+
+    heatmap_directory = os.path.join(FILE_DIRECTORY, "data","graphes")
+    picture_directory = os.path.join(FILE_DIRECTORY, "data","images")
+    
+    
+
+    timestamps_to_load = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
+    timestamps_to_load = timestamps_to_load[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load))]
+
+    
+
+    
+    dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="")
+    
+    dataWrapper.set_background_data(NEW_BACKGROUND)
+    dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
+    
+    # dataWrapper.remove_background_data()
+
+    
+    
+    random_sample = range(1000)
+
+    distance_list = []
+    lenght_list = []
+
+    
+    for i in tqdm(random_sample):
+
+        pos,analyse = dataWrapper.pipeline_process(i,cfar_threshold=5.1*(10**4))
+        if pos is not None:
+            distance_list.append(analyse.heatmap_info[0]["distance"])
+            lenght_list.append(analyse.caracteristic_length)
+            # if analyse.caracteristic_length < 1.1:
+            #     dataWrapper.plot_CFAR(i,annotated=True)
+    plt.figure()
+    plt.scatter(distance_list,lenght_list)
+    plt.show()
+            
+    
+def analyse_dataset_image_count():
+    FILE_COUNT_TO_LOAD=30000
+    FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    loss_list_all_sample = []
+    error_count_list_all_sample = []
+    
+    loss_list_1_vehicle = []
+    error_count_list_1_vehicle = []
+    
+    loss_list_0_vehicle = []
+    error_count_list_0_vehicle = []
+    
+    th = 4.1*(10**4)
+
+    pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle = analyse_dataset(save=False,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=th)
+    
+    loss_all_sample = np.mean((missmatch_count_heatmap_image)**2)
+    error_count_all_sample = np.sum(missmatch_count_heatmap_image != 0)
+    
+    loss_list_all_sample.append(loss_all_sample)
+    error_count_list_all_sample.append(error_count_all_sample/len(detected_vehicle_image))
+    
+    loss_1_vehicle = np.mean((missmatch_count_heatmap_image[detected_vehicle_image==1])**2)
+    error_count_1_vehicle = np.sum(missmatch_count_heatmap_image[detected_vehicle_image==1] != 0)
+    
+    loss_list_1_vehicle.append(loss_1_vehicle)
+    error_count_list_1_vehicle.append(error_count_1_vehicle/len(detected_vehicle_image[detected_vehicle_image==1]))
+    
+    loss_0_vehicle = np.mean((missmatch_count_heatmap_image[detected_vehicle_image==0])**2)
+    error_count_0_vehicle = np.sum(missmatch_count_heatmap_image[detected_vehicle_image==0] != 0)
+    
+    loss_list_0_vehicle.append(loss_0_vehicle)
+    error_count_list_0_vehicle.append(error_count_0_vehicle/len(detected_vehicle_image==0))
+    
+    report_str = ""
+
+    report_str += f"Analysis result for threshold {th} using {FILE_COUNT_TO_LOAD} files:\n"
+    report_str += f"\tmean energy: {np.mean(energy_heatmap)}\n"
+    report_str += f"\tmean missmatch: {np.mean(missmatch_count_heatmap_image)}\n"
+    report_str += f"\terror count: {np.sum(missmatch_count_heatmap_image != 0)} / {len(missmatch_count_heatmap_image)} ({np.sum(missmatch_count_heatmap_image != 0)/len(missmatch_count_heatmap_image)*100}%)\n"
+    report_str += f"\tloss: {loss_all_sample}\n"
+    report_str += "\tfor datapoint having one vehicle (according to yolo):\n"
+    report_str += f"\t\tmean missmatch: {loss_1_vehicle}\n"
+    report_str += f"\t\tmean energy: {np.mean(energy_heatmap[detected_vehicle_image==1])}\n"
+    report_str += f"\t\tloss: {np.mean((missmatch_count_heatmap_image[detected_vehicle_image==1])**2)}\n"
+    report_str += f"\t\terror count: {error_count_1_vehicle} / {len(missmatch_count_heatmap_image[detected_vehicle_image==1])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==1] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==1])*100}%)\n"
+    report_str += "\tfor datapoint having no vehicle (according to yolo):\n"
+    report_str += f"\t\tmean missmatch: {np.mean(missmatch_count_heatmap_image[detected_vehicle_image==0])}\n"
+    report_str += f"\t\tmean energy: {np.mean(energy_heatmap[detected_vehicle_image==0])}\n"
+    report_str += f"\t\tloss: {np.mean((missmatch_count_heatmap_image[detected_vehicle_image==0])**2)}\n"
+    report_str += f"\t\terror count: {np.sum(missmatch_count_heatmap_image[detected_vehicle_image==0] != 0)} / {len(missmatch_count_heatmap_image[detected_vehicle_image==0])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==0] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==0])*100}%)\n"
+    
+    report_str += f"\ttotal valid 1 vehicle couple: {ok_1_vehicle}/{FILE_COUNT_TO_LOAD} ({round(ok_1_vehicle/FILE_COUNT_TO_LOAD*100,2)}%)"
+    
+    print(report_str)
+    
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_threshold.pkl"),"wb") as f:
+        pickle.dump(np.array(th),f)
+    
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_all_sample.pkl"),"wb") as f:
+        pickle.dump(np.array(loss_list_all_sample),f)
+    
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_all_sample.pkl"),"wb") as f:
+        pickle.dump(np.array(error_count_list_all_sample),f)
+        
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_1_vehicle.pkl"),"wb") as f:
+        pickle.dump(np.array(loss_list_1_vehicle),f)
+    
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_1_vehicle.pkl"),"wb") as f:
+        pickle.dump(np.array(error_count_list_1_vehicle),f)
+        
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_loss_0_vehicle.pkl"),"wb") as f:
+        pickle.dump(np.array(loss_list_0_vehicle),f)
+    
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_0_vehicle.pkl"),"wb") as f:
+        pickle.dump(np.array(error_count_list_0_vehicle),f)
+        
+    with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_result.txt"),"w") as f:
+        f.write(report_str)
+
 if __name__ == "__main__":
     # test1()
     # test1bis()
@@ -1298,8 +1532,10 @@ if __name__ == "__main__":
     # test3()
     # test4()
     # analyse()
-    search_optimal_th()
+    # search_optimal_th()
     # load_plot_search_optimal_threshold()
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=1000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
+    # plot_carcteristic_lenght()
+    analyse_dataset_image_count()
     

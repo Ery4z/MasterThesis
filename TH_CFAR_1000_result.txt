@@ -1,0 +1,16 @@
+Analysis result for threshold 41000.0 using 1000 files:
+	mean energy: 48429454220504.81
+	mean missmatch: 0.327
+	error count: 471 / 1000 (47.099999999999994%)
+	loss: 0.927
+	for datapoint having one vehicle (according to yolo):
+		mean missmatch: 0.3829787234042553
+		mean energy: 30732404816742.3
+		loss: 0.3829787234042553
+		error count: 87 / 282 (30.851063829787233%)
+	for datapoint having no vehicle (according to yolo):
+		mean missmatch: 0.6753670473083198
+		mean energy: 59727494257770.79
+		loss: 1.0929853181076672
+		error count: 298 / 613 (48.613376835236544%)
+	total valid 1 vehicle couple: 159/1000 (15.9%)
