@@ -1457,7 +1457,7 @@ def analyse_dataset_image_count():
     loss_list_0_vehicle = []
     error_count_list_0_vehicle = []
     
-    th = 4.1*(10**4)
+    th = 5.2*(10**4)
 
     pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle = analyse_dataset(save=False,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=th)
     
