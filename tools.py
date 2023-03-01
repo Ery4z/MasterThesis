@@ -474,10 +474,10 @@ class DataWrapper:
         
         # kernel = triangle_kernel(3,3)
         kernel = corr_kernel(11,11,0.5)
-        filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
+        # filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
         
         
-        # data = scipy.signal.convolve2d(data, kernel, mode='same')
+        data = scipy.signal.convolve2d(data, kernel, mode='same')
         
         # data = data - filtred_bg
         return data
