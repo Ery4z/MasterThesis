@@ -1377,11 +1377,15 @@ def search_optimal_th():
         pickle.dump(np.array(error_count_list_0_vehicle),f)
 
 def search_optimal_kernel_param():
-    #TODO: Convert this function for kernel parameters
     TH = 30000
     FILE_COUNT_TO_LOAD=10000
     FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
     SAVE_DIRECTORY = os.path.join(FILE_DIRECTORY,"results_analysis_kernel_param")
+    
+    # create directory if not exist
+    if not os.path.exists(SAVE_DIRECTORY):
+        os.makedirs(SAVE_DIRECTORY)
+    
     
     min_kernel_size,max_kernel_size = 5,7#5,15
     min_sigma,max_sigma,sigma_step = 0.3,0.4,0.1#0.3,1,0.1
