@@ -1387,8 +1387,8 @@ def search_optimal_kernel_param():
         os.makedirs(SAVE_DIRECTORY)
     
     
-    min_kernel_size,max_kernel_size = 5,7#5,15
-    min_sigma,max_sigma,sigma_step = 0.3,0.4,0.1#0.3,1,0.1
+    min_kernel_size,max_kernel_size = 5,15
+    min_sigma,max_sigma,sigma_step = 0.1,1,0.1
     
     
     results_dict_list = []
@@ -1450,7 +1450,7 @@ def search_optimal_kernel_param():
             report_str += f"\t\tmean missmatch: {loss_2_vehicle}\n"
             report_str += f"\t\tmean energy: {np.mean(energy_heatmap[detected_vehicle_image==2])}\n"
             report_str += f"\t\tloss: {np.mean((missmatch_count_heatmap_image[detected_vehicle_image==2])**2)}\n"
-            report_str += f"\t\terror count: {error_count_1_vehicle} / {len(missmatch_count_heatmap_image[detected_vehicle_image==2])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==2] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==2])*100}%)\n"
+            report_str += f"\t\terror count: {error_count_2_vehicle} / {len(missmatch_count_heatmap_image[detected_vehicle_image==2])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==2] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==2])*100}%)\n"
 
             
             print(report_str)
