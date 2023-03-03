@@ -1217,7 +1217,7 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
         res_analyses = []
         
         
-        for i in tqdm(range(len(timestamps_to_load)),desc="Analysing couple"): #(random_sample:
+        for i in tqdm(range(len(timestamps_to_load)),desc="Analysing couple",leave=False): #(random_sample:
             # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
             res,res_ana = dataWrapper.pipeline_process(i,cfar_threshold=cfar_threshold,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma)
             res_analyses.append(res_ana)
