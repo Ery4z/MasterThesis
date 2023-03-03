@@ -22,6 +22,32 @@ import math
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 import json
 
+from contextlib import contextmanager
+import sys, os
+
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:  
+            yield
+        finally:
+            sys.stdout = old_stdout
+            
+            
+def get_yolo():
+    '''At the time of writign this a bug happen after importing yolo (impossible to plot with matplotlib) this is the fix'''
+        
+    with suppress_stdout():
+        b = plt.get_backend()
+        model = torch.hub.load("ultralytics/yolov5", "yolov5s",verbose=False)
+        matplotlib.use(b)
+    return model
+
+global yolo 
+yolo = get_yolo()
+
 
 ##################################### UTILITY 3d Polygon fucntion
 
@@ -120,14 +146,7 @@ def plot_analysis_result(heatmap_data, image_data, energy, pos_list,missmatch, c
     plt.title("Number of missmatch between heatmap and image")
     plt.show()
 
-def get_yolo():
-    '''At the time of writign this a bug happen after importing yolo (impossible to plot with matplotlib) this is the fix'''
-        
-    
-    b = plt.get_backend()
-    model = torch.hub.load("ultralytics/yolov5", "yolov5s",verbose=False)
-    matplotlib.use(b)
-    return model
+
 
 class MultimodalAnalysisResult:
     def __init__(self,timestamp:str,heatmap_energy:float,heatmap_info:list,raw_heatmap_info:list,image_info:list):
@@ -452,7 +471,11 @@ class DataWrapper:
         
         self.allowed_class = [1,2,3,5,7] # 1:bicycle, 2:car, 3:motorcycle, 5:bus, 7:truck
 
-        self.yolo = get_yolo()  # or yolov5n - yolov5x6, custom
+        global yolo
+        if yolo is None:
+            yolo = get_yolo()  # or yolov5n - yolov5x6, custom
+
+        self.yolo = yolo  # or yolov5n - yolov5x6, custom
         self.yolo.classes = self.allowed_class
         self.conf = 0.4
 
