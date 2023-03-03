@@ -1197,7 +1197,7 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
     timestamps_to_load_total = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
     rd.shuffle(timestamps_to_load_total)
     timestamps_to_load_total = timestamps_to_load_total[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load_total))]
-    for batch_index in tqdm(range(0,math.ceil(len(timestamps_to_load_total)/BATCH_SIZE)),desc="Batch"):
+    for batch_index in tqdm(range(0,math.ceil(len(timestamps_to_load_total)/BATCH_SIZE)),desc="Batch",leave=False):
     
 
         timestamps_to_load = timestamps_to_load_total[batch_index*BATCH_SIZE:min((batch_index+1)*BATCH_SIZE,len(timestamps_to_load_total))]
@@ -1396,7 +1396,7 @@ def search_optimal_kernel_param():
     
     for k_size in tqdm(k_size_space,desc="k_size"):
         
-        for sigma in tqdm(sigma_space,desc="sigma"):
+        for sigma in tqdm(sigma_space,desc="sigma",leave=False):
             sub_dict = {}
             
             
