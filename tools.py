@@ -1453,7 +1453,7 @@ def search_optimal_kernel_param():
             report_str += f"\t\terror count: {error_count_2_vehicle} / {len(missmatch_count_heatmap_image[detected_vehicle_image==2])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==2] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==2])*100}%)\n"
 
             
-            print(report_str)
+            # print(report_str)
             
             sub_dict["sigma"] = sigma
             sub_dict["kernel_size"] = k_size
