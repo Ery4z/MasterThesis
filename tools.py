@@ -20,7 +20,7 @@ import torch
 import cv2
 import math
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
-
+import json
 
 
 ##################################### UTILITY 3d Polygon fucntion
@@ -122,8 +122,10 @@ def plot_analysis_result(heatmap_data, image_data, energy, pos_list,missmatch, c
 
 def get_yolo():
     '''At the time of writign this a bug happen after importing yolo (impossible to plot with matplotlib) this is the fix'''
+        
+    
     b = plt.get_backend()
-    model = torch.hub.load("ultralytics/yolov5", "yolov5s")
+    model = torch.hub.load("ultralytics/yolov5", "yolov5s",verbose=False)
     matplotlib.use(b)
     return model
 
@@ -403,7 +405,7 @@ class DataWrapper:
     Motivation: When this work started, analysing the filtering of the heatmap was not easy. It was necessary to compare it with real picture.
     As teh data is multimodal, associating the two is not stupid and having utilities to compare the two modality for a certain time index is quite useful.
     """
-    def __init__(self, heatmap_dir, picture_dir, timestamps_to_load, picture_name_prefix="", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix=""):
+    def __init__(self, heatmap_dir, picture_dir, timestamps_to_load, picture_name_prefix="", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="",silent=False):
         """Generate the class
 
         Args:
@@ -414,6 +416,7 @@ class DataWrapper:
             picture_extension_suffix (str, optional): Extension file for the picture. Defaults to "jpeg".
             heatmap_extension_suffix (str, optional): Extension file for the heatmap. Defaults to "doppler".
             heatmap_name_prefix (str, optional): Prefix for the heatmap filename, usually "". Defaults to "".
+            silent (bool, optional): If True, no print will be done. Defaults to False.
         """
 
         self.radar_parameters = {
@@ -437,6 +440,10 @@ class DataWrapper:
         self.picture_data_annotated = np.array([])
         
         self.background_data = None
+        
+        self.silent = silent
+        if self.silent :
+            os.environ["YOLOv5_VERBOSE"]="FALSE"
 
         
         self.heatmap_mean = None
@@ -456,7 +463,7 @@ class DataWrapper:
         self.load_heatmap_data()
         self.load_picture_data()
     
-    def filter(self,data):
+    def filter(self,data,gauss_kernel_length=11,gauss_sigma=0.5):
         """Main function to modify the filtering of the heatmap data. You may overwrite this function.
 
         Args:
@@ -473,7 +480,7 @@ class DataWrapper:
         data = np.maximum(data, 0)
         
         # kernel = triangle_kernel(3,3)
-        kernel = corr_kernel(11,11,0.5)
+        kernel = corr_kernel(gauss_kernel_length,gauss_kernel_length,gauss_sigma)
         # filtred_bg = scipy.signal.convolve2d(self.background_data, kernel, mode='same')
         
         
@@ -544,7 +551,7 @@ class DataWrapper:
         
     
     
-    def analyse_couple(self,index,plot=False,cfar_threshold=30):
+    def analyse_couple(self,index,plot=False,cfar_threshold=30, gauss_kernel_length=11,gauss_sigma=0.5):
         """Utility function to analyse the couple of data.
         This function is not mean for data pipeline but for user end.
 
@@ -563,7 +570,7 @@ class DataWrapper:
         
         solver = CounterVehicleCFAR()
         heatmap_data = self.heatmap_data[index]
-        filtered_heatmap_data = self.filter(heatmap_data)
+        filtered_heatmap_data = self.filter(heatmap_data,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma)
         
         cfar_data, _, spotted = self.CFAR_loaded(filtered_heatmap_data,threshold=cfar_threshold)
         
@@ -695,9 +702,11 @@ class DataWrapper:
         """Load the heatmap data to the good variable based on the path given on the class creation
         """
         tmp_data_list = []
+        
+        iterator = tqdm(self.timestamps_to_load,desc="Loading heatmap data") if not self.silent else self.timestamps_to_load
 
         
-        for timestamp in tqdm(self.timestamps_to_load,desc="Loading heatmap data"):
+        for timestamp in iterator:
             
             heatmap_name = self.heatmap_name_prefix + timestamp + "." + self.heatmap_extension_suffix
             heatmap_path = os.path.join(self.heatmap_dir, heatmap_name)
@@ -716,7 +725,9 @@ class DataWrapper:
         """
         tmp_data_list = []
         
-        for timestamp in tqdm(self.timestamps_to_load,desc="Loading picture data"):
+        iterator = tqdm(self.timestamps_to_load,desc="Loading picture data") if not self.silent else self.timestamps_to_load
+        
+        for timestamp in iterator:
             
             picture_name = self.picture_name_prefix + timestamp + "." + self.picture_extension_suffix
 
@@ -785,8 +796,10 @@ class DataWrapper:
         
         available_pictures = [f for f in os.listdir(self.picture_dir) if f.split(".")[-1] == self.picture_extension_suffix]
         available_heatmaps = [f for f in os.listdir(self.heatmap_dir) if f.split(".")[-1] == self.heatmap_extension_suffix]
+        
+        iterable = tqdm(self.timestamps_to_load,desc="Checking file existence") if not self.silent else self.timestamps_to_load
 
-        for timestamp in tqdm(self.timestamps_to_load,desc="Checking file existence"):
+        for timestamp in iterable:
 
             picture_name = self.picture_name_prefix + timestamp + "." + self.picture_extension_suffix
             
@@ -955,8 +968,21 @@ class DataWrapper:
         
         plt.show()
 
-    def pipeline_process(self,index,debug=False,cfar_threshold=30,length_threshold=1.1):
-        result_analysis = self.analyse_couple(index, plot=False, cfar_threshold=cfar_threshold)
+    def pipeline_process(self,index,debug=False,cfar_threshold=52000,length_threshold=1.1,gauss_kernel_length=11,gauss_sigma=0.5):
+        """Main function to process data couple.
+
+        Args:
+            index (int): Index of the couple to process.
+            debug (bool, optional): Print warning message on error. Defaults to False.
+            cfar_threshold (int, optional): Threshold for object detection in the heatmap. Defaults to 52000.
+            length_threshold (float, optional): Threshold for detecting abnormally small object. Defaults to 1.1.
+            gauss_kernel_length (int, optional): Length of the gaussian kernel. Defaults to 11.
+            gauss_sigma (float, optional): Variance parameter of the gaussian kernel. Defaults to 0.5.
+
+        Returns:
+            [[3]int,MultimodalAnalysisResult]: Couple position of the detected object, result of the analysis.
+        """
+        result_analysis = self.analyse_couple(index, plot=False, cfar_threshold=cfar_threshold,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma)
         
         # Check if the number of detected object match the number of object in the picture
         detected_heatmap_count = len(result_analysis.heatmap_info)
@@ -1128,8 +1154,7 @@ def test2():
     res,bb_box_3d_pos = from_multimodal_analysis_result_to_3d(struct_analyse,camera_parameters)
     print(res)
     
-def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=30,save=True):
-
+def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)),customfilter=None,cfar_threshold=52000,save=True,gauss_kernel_length=11,gauss_sigma=0.5,silent=False):
     
     BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
     MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
@@ -1154,7 +1179,7 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
 
         timestamps_to_load = timestamps_to_load_total[batch_index*BATCH_SIZE:min((batch_index+1)*BATCH_SIZE,len(timestamps_to_load_total))]
 
-        dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="")
+        dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="",silent=silent)
         
         dataWrapper.set_background_data(BACKGROUND_FILE)
         dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
@@ -1168,9 +1193,10 @@ def analyse_dataset(BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,FILE_DIRECTORY =
         # random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),100)
         res_analyses = []
         
+        
         for i in tqdm(range(len(timestamps_to_load)),desc="Analysing couple"): #(random_sample:
             # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
-            res,res_ana = dataWrapper.pipeline_process(i,cfar_threshold=cfar_threshold)
+            res,res_ana = dataWrapper.pipeline_process(i,cfar_threshold=cfar_threshold,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma)
             res_analyses.append(res_ana)
             if res is not None:
                 pos_list.append(res)
@@ -1326,7 +1352,113 @@ def search_optimal_th():
     
     with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_errors_0_vehicle.pkl"),"wb") as f:
         pickle.dump(np.array(error_count_list_0_vehicle),f)
+
+def search_optimal_kernel_param():
+    #TODO: Convert this function for kernel parameters
+    TH = 30000
+    FILE_COUNT_TO_LOAD=10000
+    FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    SAVE_DIRECTORY = os.path.join(FILE_DIRECTORY,"results_analysis_kernel_param")
     
+    min_kernel_size,max_kernel_size = 5,7#5,15
+    min_sigma,max_sigma,sigma_step = 0.3,0.4,0.1#0.3,1,0.1
+    
+    
+    results_dict_list = []
+    
+    search_space = np.logspace(3,6,num=100)
+    
+    k_size_space = range(min_kernel_size,max_kernel_size+1,2)
+    sigma_space = np.arange(min_sigma,max_sigma,sigma_step)
+    
+    for k_size in tqdm(k_size_space,desc="k_size"):
+        
+        for sigma in tqdm(sigma_space,desc="sigma"):
+            sub_dict = {}
+            
+            
+            pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle = analyse_dataset(save=False,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD, gauss_kernel_length=k_size,gauss_sigma=sigma,silent=True)
+        
+            loss_all_sample = np.mean((missmatch_count_heatmap_image)**2)
+            error_count_all_sample = np.sum(missmatch_count_heatmap_image != 0)
+            
+
+            
+            loss_1_vehicle = np.mean((missmatch_count_heatmap_image[detected_vehicle_image==1])**2)
+            error_count_1_vehicle = np.sum(missmatch_count_heatmap_image[detected_vehicle_image==1] != 0)
+            
+
+            
+            loss_0_vehicle = np.mean((missmatch_count_heatmap_image[detected_vehicle_image==0])**2)
+            error_count_0_vehicle = np.sum(missmatch_count_heatmap_image[detected_vehicle_image==0] != 0)
+            
+
+            
+            loss_2_vehicle = np.mean((missmatch_count_heatmap_image[detected_vehicle_image==2])**2)
+            error_count_2_vehicle = np.sum(missmatch_count_heatmap_image[detected_vehicle_image==2] != 0)
+            
+
+            
+            report_str = ""
+        
+            report_str += f"Analysis result for kernel size {k_size} kernel sigma {sigma} using {FILE_COUNT_TO_LOAD} files:\n"
+            report_str += f"\tmean energy: {np.mean(energy_heatmap)}\n"
+            report_str += f"\tmean missmatch: {np.mean(missmatch_count_heatmap_image)}\n"
+            report_str += f"\terror count: {np.sum(missmatch_count_heatmap_image != 0)} / {len(missmatch_count_heatmap_image)} ({np.sum(missmatch_count_heatmap_image != 0)/len(missmatch_count_heatmap_image)*100}%)\n"
+            report_str += f"\tloss: {loss_all_sample}\n"
+            
+            report_str += "\tfor datapoint having one vehicle (according to yolo):\n"
+            report_str += f"\t\tmean missmatch: {loss_1_vehicle}\n"
+            report_str += f"\t\tmean energy: {np.mean(energy_heatmap[detected_vehicle_image==1])}\n"
+            report_str += f"\t\tloss: {np.mean((missmatch_count_heatmap_image[detected_vehicle_image==1])**2)}\n"
+            report_str += f"\t\terror count: {error_count_1_vehicle} / {len(missmatch_count_heatmap_image[detected_vehicle_image==1])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==1] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==1])*100}%)\n"
+            
+            report_str += "\tfor datapoint having no vehicle (according to yolo):\n"
+            report_str += f"\t\tmean missmatch: {np.mean(missmatch_count_heatmap_image[detected_vehicle_image==0])}\n"
+            report_str += f"\t\tmean energy: {np.mean(energy_heatmap[detected_vehicle_image==0])}\n"
+            report_str += f"\t\tloss: {np.mean((missmatch_count_heatmap_image[detected_vehicle_image==0])**2)}\n"
+            report_str += f"\t\terror count: {np.sum(missmatch_count_heatmap_image[detected_vehicle_image==0] != 0)} / {len(missmatch_count_heatmap_image[detected_vehicle_image==0])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==0] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==0])*100}%)\n"
+            
+            report_str += "\tfor datapoint having two vehicle (according to yolo):\n"
+            report_str += f"\t\tmean missmatch: {loss_2_vehicle}\n"
+            report_str += f"\t\tmean energy: {np.mean(energy_heatmap[detected_vehicle_image==2])}\n"
+            report_str += f"\t\tloss: {np.mean((missmatch_count_heatmap_image[detected_vehicle_image==2])**2)}\n"
+            report_str += f"\t\terror count: {error_count_1_vehicle} / {len(missmatch_count_heatmap_image[detected_vehicle_image==2])} ({np.sum(missmatch_count_heatmap_image[detected_vehicle_image==2] != 0)/len(missmatch_count_heatmap_image[detected_vehicle_image==2])*100}%)\n"
+
+            
+            print(report_str)
+            
+            sub_dict["sigma"] = sigma
+            sub_dict["kernel_size"] = k_size
+            
+            sub_dict["error_count"] = error_count_all_sample/len(detected_vehicle_image)
+            sub_dict["loss"] = loss_all_sample
+            
+            sub_dict["error_count_1_vehicle"] = error_count_1_vehicle/len(detected_vehicle_image[detected_vehicle_image==1])
+            sub_dict["loss_1_vehicle"] = loss_1_vehicle
+            
+            sub_dict["error_count_0_vehicle"] = error_count_0_vehicle/len(detected_vehicle_image[detected_vehicle_image==0])
+            sub_dict["loss_0_vehicle"] = loss_0_vehicle
+            
+            sub_dict["error_count_2_vehicle"] = error_count_2_vehicle/len(detected_vehicle_image[detected_vehicle_image==2])
+            sub_dict["loss_2_vehicle"] = loss_2_vehicle
+            
+            sub_dict["mean_energy"] = np.mean(energy_heatmap)
+            sub_dict["mean_missmatch"] = np.mean(missmatch_count_heatmap_image)
+            
+            results_dict_list.append(sub_dict)
+            
+            
+
+
+    
+    with open(os.path.join(SAVE_DIRECTORY,f"analysis_ks<{min_kernel_size},{max_kernel_size}>_sigma<{min_sigma},{max_sigma},{sigma_step}>.json"),"wb") as f:
+        json.dump(results_dict_list,f)
+    
+    
+    
+
+
 def load_plot_search_optimal_threshold():
     FILE_COUNT_TO_LOAD = 10000
     FILE_DIRECTORY_ANALYSE = os.path.join(FILE_DIRECTORY,"optimal_th_analysis","analysis6_10000_raw")
@@ -1525,6 +1657,47 @@ def analyse_dataset_image_count():
     with open(os.path.join(FILE_DIRECTORY,f"TH_CFAR_{FILE_COUNT_TO_LOAD}_result.txt"),"w") as f:
         f.write(report_str)
 
+
+def labelize_dataset(cfar_threshold=5.2*(10**4),length_threshold=1.1):
+    FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+    FILE_COUNT_TO_LOAD = 1000
+    cfar_threshold = 50000
+    
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"background.doppler")
+    MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
+    NEW_BACKGROUND = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
+    
+    
+
+    heatmap_directory = os.path.join(FILE_DIRECTORY, "data","graphes")
+    picture_directory = os.path.join(FILE_DIRECTORY, "data","images")
+    
+    
+
+    timestamps_to_load = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
+    timestamps_to_load = timestamps_to_load[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load))]
+
+    
+
+    
+    dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="")
+    
+    dataWrapper.set_background_data(NEW_BACKGROUND)
+    dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
+    
+    # dataWrapper.remove_background_data()
+
+    
+    
+    random_sample = range(10)
+    
+
+    
+    for i in random_sample:
+        
+        pos,analysis = dataWrapper.pipeline_process(i,cfar_threshold=cfar_threshold,length_threshold=length_threshold)
+
+
 if __name__ == "__main__":
     # test1()
     # test1bis()
@@ -1537,5 +1710,5 @@ if __name__ == "__main__":
     # analyse_dataset(save=True,FILE_COUNT_TO_LOAD=1000,cfar_threshold=210000)
     # rank_analysis(save=True,cfar_threshold=50000,FILE_COUNT_TO_LOAD=3000)
     # plot_carcteristic_lenght()
-    analyse_dataset_image_count()
-    
+    # analyse_dataset_image_count()
+    search_optimal_kernel_param()
