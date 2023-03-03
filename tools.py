@@ -1479,7 +1479,7 @@ def search_optimal_kernel_param():
 
 
     
-    with open(os.path.join(SAVE_DIRECTORY,f"analysis_ks<{min_kernel_size},{max_kernel_size}>_sigma<{min_sigma},{max_sigma},{sigma_step}>.json"),"wb") as f:
+    with open(os.path.join(SAVE_DIRECTORY,f"analysis_ks<{min_kernel_size},{max_kernel_size}>_sigma<{min_sigma},{max_sigma},{sigma_step}>.json"),"w") as f:
         json.dump(results_dict_list,f)
     
     
