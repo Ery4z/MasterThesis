@@ -67,6 +67,8 @@ def unit_normal(a, b, c):
              [b[0],b[1],1],
              [c[0],c[1],1]])
     magnitude = (x**2 + y**2 + z**2)**.5
+    if magnitude == 0:
+        return (0,0,0)
     return (x/magnitude, y/magnitude, z/magnitude)
 
 #dot product of vectors a and b
