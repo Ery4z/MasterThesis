@@ -82,17 +82,21 @@ def load_analysis_result(path:str):
 class MultimodalAnalysisResult:
     def __init__(self,timestamp:str,heatmap_energy:float,heatmap_info:list,raw_heatmap_info:list,image_info:list):
 
-        self.timestamp = timestamp
+        self.timestamp = float(timestamp)
         self.heatmap_energy = heatmap_energy
         self.heatmap_info = heatmap_info
         self.raw_heatmap_info = raw_heatmap_info
         self.image_info = image_info
+        self.position = None
     
     def set_caracteristic_length(self,caracteristic_length):
         self.caracteristic_length = caracteristic_length
         
     def set_bbox_3d(self,points):
         self.bbox_3d = points
+        
+    def set_position(self,position):
+        self.position = position
 
 def get_caracteristic_length(analysis_result: MultimodalAnalysisResult):
     """Get the caracteristic length of the detected vehicle

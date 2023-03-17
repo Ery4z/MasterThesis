@@ -81,6 +81,7 @@ def pipeline_process(self,index,debug=False,cfar_threshold=52000,length_threshol
         if caracteristic_lenght < length_threshold:
             return None,result_analysis
         
+        result_analysis.set_position(pos_3d)
         
         
         return pos_3d, result_analysis
@@ -155,7 +156,7 @@ def analyse_couple(self,index,plot=False,cfar_threshold=30, gauss_kernel_length=
     analyse["image_info"] = image_info
     
     # Get the image with bounding boxes
-    self.add_annotation(index,image_info)
+    #self.add_annotation(index,image_info)
     if plot:
         # Extract the image to a numpy array
         print(analyse)
@@ -228,6 +229,36 @@ def add_annotation(self,index,image_info):
         image = cv2.putText(image, info["class"], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 4, (255, 0, 0), 8)
         image = cv2.putText(image, "{:.2f}".format(round(info["confidence"], 2)), (x2, y2), cv2.FONT_HERSHEY_SIMPLEX, 4, (255,0, 0), 8)
     
+    self.picture_data_annotated[index] = image
+    
+def add_identification(self,index,bbox,label,score_details=None):
+    image = self.picture_data_annotated[index]
+    thickness = 5
+    
+    x1, y1, x2, y2 = bbox
+    
+    color = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+    hash_id = hash(label) % len(color)
+    
+    color_for_box = color[hash_id]
+    
+    image = cv2.rectangle(image, (x1, y1), (x2, y2), color_for_box, thickness)
+    image = cv2.putText(image, str(label), (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 16)
+    image = cv2.putText(image, str(label), (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 8)
+
+    if score_details is not None:
+        header = "Metric Name: Score_top_id | New"
+        image = cv2.putText(image, header, (0, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 10)
+        image = cv2.putText(image, header, (0, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 5)
+        
+        
+        for i,metric_detail in enumerate(score_details):
+            text = str(metric_detail[0]) +":  "+ str(metric_detail[1]) + " | " + str(metric_detail[2])
+            
+            image = cv2.putText(image, text, (0, (i+2)*50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 10)
+            image = cv2.putText(image,  text, (0, (i+2)*50), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 5)
+            
+
     self.picture_data_annotated[index] = image
     
 def calculate_CFAR(self,data,threshold=30):

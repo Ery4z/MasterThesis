@@ -1,4 +1,4 @@
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import numpy as np
 from .utilities import slog
 
@@ -90,6 +90,7 @@ def plot_CFAR(self,index,annotated=False):
         annotated (bool, optional): Should use the potentionnaly annotated data ?. Defaults to False.
     """
     plt.figure()
+    
     plt.subplot(1,3,1)
     data = self.heatmap_data[index]
     data = self.filter(data)

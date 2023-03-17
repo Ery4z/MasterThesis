@@ -6,6 +6,11 @@ import random as rd
 import numpy as np
 import pickle
 import json
+from ..analysis_utilities import plot_analysis_result
+
+from .._identifier import VehicleIdentifier
+
+from ..utilities import generate_video_annotated
 
 def analyse_dataset_batch(FILE_DIRECTORY,BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,customfilter=None,cfar_threshold=52000,save=True,gauss_kernel_length=11,gauss_sigma=0.5,silent=False):
     """Function used to analyse the dataset. This is the low level wrapper allowing to analyse the dataset in batches. This is useful when the dataset is too large to be loaded in memory.
@@ -310,7 +315,7 @@ def search_optimal_kernel_param():
     with open(os.path.join(SAVE_DIRECTORY,f"analysis_ks<{min_kernel_size},{max_kernel_size}>_sigma<{min_sigma},{max_sigma},{sigma_step}>.json"),"w") as f:
         json.dump(results_dict_list,f)
     
-def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
+def rank_analysis(FILE_DIRECTORY,save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
     pos_list,missmatch_count_heatmap_image,energy_heatmap,detected_vehicle_heatmap,detected_vehicle_image,ok_1_vehicle = analyse_dataset_batch(save=True,FILE_COUNT_TO_LOAD=FILE_COUNT_TO_LOAD,cfar_threshold=210000)
     
     loss = np.mean((missmatch_count_heatmap_image)**2)
@@ -339,3 +344,67 @@ def rank_analysis(save=True,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
         f.write(report_str)
         
     plot_analysis_result(detected_vehicle_heatmap, detected_vehicle_image, energy_heatmap, pos_list,missmatch_count_heatmap_image,CAMERA_PARAM )
+
+
+def dataset_visual_identification_analysis(FILE_DIRECTORY,export_video=True,show_plot=False,BATCH_SIZE=200,cfar_threshold=210000,FILE_COUNT_TO_LOAD=3000):
+    BACKGROUND_FILE = os.path.join(FILE_DIRECTORY,"new_new_background.doppler")
+    MEAN_HEATMAP_FILE = os.path.join(FILE_DIRECTORY,"mean_heatmap.doppler")
+    
+
+    heatmap_directory = os.path.join(FILE_DIRECTORY, "data","graphes")
+    picture_directory = os.path.join(FILE_DIRECTORY, "data","images")
+    output_directory = os.path.join(FILE_DIRECTORY, "data","annotated")
+
+
+    timestamps_to_load_total = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
+    timestamps_to_load_total = timestamps_to_load_total[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load_total))]
+    
+    identifier = VehicleIdentifier().set_metric_example().set_metric_euclidian_distance().set_metric_bb_common_area()
+    
+    # Delete content of output directory
+    
+    for f in os.listdir(output_directory):
+        os.remove(os.path.join(output_directory,f))
+    
+    
+    for batch_index in tqdm(range(0,math.ceil(len(timestamps_to_load_total)/BATCH_SIZE)),desc="Batch",leave=False):
+    
+
+        timestamps_to_load = timestamps_to_load_total[batch_index*BATCH_SIZE:min((batch_index+1)*BATCH_SIZE,len(timestamps_to_load_total))]
+
+        dataWrapper = DataWrapper(heatmap_directory, picture_directory, timestamps_to_load, picture_name_prefix="0", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="",picture_output_dir=output_directory)
+        
+        dataWrapper.set_background_data(BACKGROUND_FILE)
+        dataWrapper.set_mean_heatmap_data(MEAN_HEATMAP_FILE)
+
+
+        
+        
+        # random_sample = rd.sample(range(FILE_COUNT_TO_LOAD),100)
+        res_analyses = []
+        
+        
+        for i in tqdm(range(len(timestamps_to_load)),desc="Analysing couple",leave=False): #(random_sample:
+            # dataWrapper.plot(i,logarithmic=False,sign_color_map=False)
+            res,res_ana = dataWrapper.pipeline_process(i,cfar_threshold=cfar_threshold)
+            res_analyses.append(res_ana)
+            if res is not None:
+                vehicle_identifier,score_detail = identifier.identify(res_ana,get_score_detail=True)
+                dataWrapper.add_identification(i,res_ana.image_info[0]["bbox"],vehicle_identifier,score_details=score_detail)
+                if show_plot:
+                    dataWrapper.plot_CFAR(i,annotated=True)
+            dataWrapper.save_annotated_picture(i)
+    
+    if export_video:
+        
+        generate_video_annotated(output_directory)
+        
+    # Remove the pictures from the output directory
+    
+    """for f in os.listdir(output_directory):
+        if "jpg" in f:
+            os.remove(os.path.join(output_directory,f))"""
+            
+                
+    
+    

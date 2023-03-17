@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm
 import pickle
+import cv2
+import os
 
 
 def get_color_map(self,data):
@@ -55,3 +57,20 @@ def save_mean_heatmap_data(self, mean_data_path):
     assert self.heatmap_mean is not None, "Please calculate the heatmap mean data first."
     with open(mean_data_path,"wb") as f:
         pickle.dump(self.heatmap_mean, f)
+
+def save_annotated_picture(self,index,extention="jpg"):
+    """Utility function to save the annotated picture
+    """
+    if self.picture_output_dir is None:
+        raise ValueError("Please set the output directory for the picture")
+    
+    os.makedirs(self.picture_output_dir, exist_ok=True)
+    
+    picture_data = self.picture_data_annotated[index]
+    
+    image_path = os.path.join(self.picture_output_dir, self.timestamps_to_load[index] + "."+extention)
+    
+    picture_data = cv2.cvtColor(picture_data.astype('float32'), cv2.COLOR_BGR2RGB)
+    
+    cv2.imwrite(image_path, picture_data)
+    

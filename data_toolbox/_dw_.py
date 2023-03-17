@@ -56,10 +56,10 @@ class DataWrapper:
     # Importing the method of the class
     from ._dw_plot import plot_background, plot_mean, plot, plot_radar_wrapper, plot_CFAR, plot_comparison_filter
     from ._dw_data_loading import check_timestamp, check_directory, load_file, load_heatmap_data,load_picture_data
-    from ._dw_utilities import get_color_map,set_background_data,save_mean_heatmap_data,set_mean_heatmap_data
-    from ._dw_processing import pipeline_process,filter, analyse_couple,remove_background_data,calculate_heatmap_mean,remove_temporal_mean,analyse_image,add_annotation,calculate_CFAR
+    from ._dw_utilities import get_color_map,set_background_data,save_mean_heatmap_data,set_mean_heatmap_data,save_annotated_picture
+    from ._dw_processing import pipeline_process,filter, analyse_couple,remove_background_data,calculate_heatmap_mean,remove_temporal_mean,analyse_image,add_annotation,calculate_CFAR,add_identification
     
-    def __init__(self, heatmap_dir, picture_dir, timestamps_to_load, picture_name_prefix="", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="",silent=False):
+    def __init__(self, heatmap_dir, picture_dir, timestamps_to_load, picture_name_prefix="", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="",picture_output_dir=None,silent=False):
         """Generate the class
 
         Args:
@@ -70,6 +70,7 @@ class DataWrapper:
             picture_extension_suffix (str, optional): Extension file for the picture. Defaults to "jpeg".
             heatmap_extension_suffix (str, optional): Extension file for the heatmap. Defaults to "doppler".
             heatmap_name_prefix (str, optional): Prefix for the heatmap filename, usually "". Defaults to "".
+            picture_output_dir (str, optional): Path of the output directory for the annotated picture. Defaults to None.
             silent (bool, optional): If True, no print will be done. Defaults to False.
         """
 
@@ -92,6 +93,8 @@ class DataWrapper:
         self.heatmap_data = np.array([])
         self.picture_data = np.array([])
         self.picture_data_annotated = np.array([])
+        
+        self.picture_output_dir = picture_output_dir
         
         self.background_data = None
         
