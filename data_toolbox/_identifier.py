@@ -3,7 +3,7 @@ import uuid
 import numpy as np
 
 class VehicleIdentifier:
-    def __init__(self,decay_duration_identifier=60):
+    def __init__(self,decay_duration_identifier=10):
         
         self.__activated_metrics = []
         self.__activated_metrics_weight = []
@@ -106,7 +106,7 @@ class VehicleIdentifier:
                 
         
         if ranking_list[0][0] == "new":
-            vehicle_identifier = uuid.uuid4()
+            vehicle_identifier = str(uuid.uuid4())
         else :
             try:
                 vehicle_identifier = ranking_list[0][0]
@@ -114,7 +114,10 @@ class VehicleIdentifier:
                 vehicle_identifier = None
         
         if vehicle_identifier is not None:
-            self.__identifier_pool[vehicle_identifier] = analysis_result
+            if vehicle_identifier not in self.__identifier_pool:
+                self.__identifier_pool[vehicle_identifier] = []
+                
+            self.__identifier_pool[vehicle_identifier].append(analysis_result)
         
         
         
@@ -126,7 +129,7 @@ class VehicleIdentifier:
     def __clean_up(self,analysis_result):
         to_delete = []
         for identifier in self.__identifier_pool:
-            last_identified_data: MultimodalAnalysisResult  = self.__identifier_pool[identifier]
+            last_identified_data: MultimodalAnalysisResult  = self.__identifier_pool[identifier][-1]
             
             timestamp_delta = float(analysis_result.timestamp) - float(last_identified_data.timestamp)
             if timestamp_delta > self.__decay_duration_identifier:
@@ -151,7 +154,7 @@ class VehicleIdentifier:
         }
         
         for identifier in identifier_pool:
-            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier]
+            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier][-1]
             
             timestamp_delta = analysis_result.timestamp - last_identified_data.timestamp
             
@@ -190,7 +193,7 @@ class VehicleIdentifier:
         }
         
         for identifier in identifier_pool:
-            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier]
+            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier][-1]
             
             timestamp_delta = analysis_result.timestamp - last_identified_data.timestamp
             
@@ -232,7 +235,7 @@ class VehicleIdentifier:
         }
         
         for identifier in identifier_pool:
-            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier]
+            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier][-1]
             
             timestamp_delta = analysis_result.timestamp - last_identified_data.timestamp
             
@@ -274,3 +277,120 @@ class VehicleIdentifier:
         self.__activated_metrics_name.append("bb_cmn_area")
         
         return self
+    
+    def __metric_constraint_caracteristic_length(self,analysis_result:MultimodalAnalysisResult):
+        """The purpose of this metric is establish a constrain on the variation of the caracteristic length of the vehicle.
+        """
+        identifier_pool = self.__identifier_pool
+        
+        # For needing at least 1 pixel in common to be considered as the same vehicle
+        score = {
+            "new": 1,
+        }
+        
+        for identifier in identifier_pool:
+            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier][-1]
+            
+            caracteristic_length_history = []
+            for data in identifier_pool[identifier]:
+                if data.caracteristic_length is not None:
+                    caracteristic_length_history.append([data.timestamp,data.caracteristic_length])
+            
+            
+            
+            is_caracteristic_length_decreasing = (len(caracteristic_length_history)>3) and (caracteristic_length_history[-3] > caracteristic_length_history[-2])
+            
+            
+            if caracteristic_length_history[-2] < 1.5 and is_caracteristic_length_decreasing:
+                #TODO: Finish this
+                pass
+                
+            
+            
+            timestamp_delta = analysis_result.timestamp - last_identified_data.timestamp
+            
+            previous_bb = np.array(last_identified_data.image_info[0]["bbox"])
+            current_bb = np.array(analysis_result.image_info[0]["bbox"])
+            
+            common_area =  np.array([max(previous_bb[0],current_bb[0]),max(previous_bb[1],current_bb[1]),min(previous_bb[2],current_bb[2]),min(previous_bb[3],current_bb[3])])
+            
+
+            
+            area_int = (max(common_area[2]-common_area[0],0))*(max(common_area[3]-common_area[1],0))
+            # The more area the lower the score
+            
+            
+            # Euclidian distance
+            score[identifier] = area_int
+        
+        # Normalize the score
+        maximum = max(score.values())
+        if maximum != 0:
+            for identifier in score:
+                score[identifier] = score[identifier]/maximum
+                
+        # Reversing the score 0 -> 1 and 1 -> 0
+        
+        for identifier in score:
+            score[identifier] = 1 - score[identifier]
+        
+        # Fixing the new to 0 as this metric should not penalise new score
+        score["new"] = 0
+        
+        
+        
+        return score
+    
+    def __metric_time_delay(self,analysis_result:MultimodalAnalysisResult):
+        """The purpose of this metric is to calculate the time delay between the mean of the previous data and the current data.
+        """
+        identifier_pool = self.__identifier_pool
+        
+        # penalize a sample arriving at least 2 time more than the average time
+        score = {
+            "new": 2,
+        }
+        
+        for identifier in identifier_pool:
+            last_identified_data: MultimodalAnalysisResult  = identifier_pool[identifier][-1]
+            
+            delta_timestamp_history = []
+            previous_timestamp = None
+            
+            
+            for data in identifier_pool[identifier]:
+                if previous_timestamp is not None:
+                    delta_timestamp_history.append(data.timestamp - previous_timestamp)
+                previous_timestamp = data.timestamp
+            
+            if delta_timestamp_history == []:
+                score[identifier] = 1
+                continue
+            
+            
+            delta_timestamp_history = np.array(delta_timestamp_history)
+            
+            this_delta = analysis_result.timestamp - previous_timestamp
+            
+            score[identifier] = max((this_delta/np.mean(delta_timestamp_history) - 1),0)
+                
+        # Normalize the score
+        
+        # base_value = sorted(score.values())[1] if len(score) > 1 else 1
+        # if base_value != 0:
+        #     for identifier in score:
+        #         score[identifier] = score[identifier]/base_value
+        
+        
+        
+        return score
+    
+    def set_metric_time_delay(self,weight=1):
+        self.__activated_metrics.append(self.__metric_time_delay)
+        self.__activated_metrics_weight.append(weight)
+        self.__activated_metrics_name.append("time_delay")
+        
+        return self
+    
+    def get_identifier_pool(self):
+        return self.__identifier_pool

@@ -1,3 +1,4 @@
 data/**/*
 yolov3.weights
 venv/**/*
+**DATASET**

@@ -3,7 +3,8 @@ from .analysis_utilities import MultimodalAnalysisResult,CounterVehicleCFAR, get
 from ._math_utilities import corr_kernel,fast_convolution
 from scipy.signal import convolve2d
 import cv2
-
+import pickle
+import os
 
 def filter(self,data,gauss_kernel_length=11,gauss_sigma=0.5):
     """Main function to modify the filtering of the heatmap data. You may overwrite this function.
@@ -31,7 +32,7 @@ def filter(self,data,gauss_kernel_length=11,gauss_sigma=0.5):
     # data = data - filtred_bg
     return data
 
-def pipeline_process(self,index,debug=False,cfar_threshold=52000,length_threshold=1.1,gauss_kernel_length=11,gauss_sigma=0.5):
+def pipeline_process(self,index,debug=False,cfar_threshold=52000,length_threshold=1.1,gauss_kernel_length=11,gauss_sigma=0.5,save_path_filtred_heatmap=None):
         """Main function to process data couple.
 
         Args:
@@ -45,7 +46,7 @@ def pipeline_process(self,index,debug=False,cfar_threshold=52000,length_threshol
         Returns:
             [[3]int,MultimodalAnalysisResult]: Couple position of the detected object, result of the analysis.
         """
-        result_analysis = self.analyse_couple(index, plot=False, cfar_threshold=cfar_threshold,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma)
+        result_analysis = self.analyse_couple(index, plot=False, cfar_threshold=cfar_threshold,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma,save_path_filtred_heatmap=save_path_filtred_heatmap)
         
         # Check if the number of detected object match the number of object in the picture
         detected_heatmap_count = len(result_analysis.heatmap_info)
@@ -91,7 +92,7 @@ def pipeline_process(self,index,debug=False,cfar_threshold=52000,length_threshol
 
 
 
-def analyse_couple(self,index,plot=False,cfar_threshold=30, gauss_kernel_length=11,gauss_sigma=0.5):
+def analyse_couple(self,index,plot=False,cfar_threshold=30, gauss_kernel_length=11,gauss_sigma=0.5,save_path_filtred_heatmap=None):
     """Utility function to analyse the couple of data.
     This function is not mean for data pipeline but for user end.
 
@@ -111,6 +112,15 @@ def analyse_couple(self,index,plot=False,cfar_threshold=30, gauss_kernel_length=
     solver = CounterVehicleCFAR()
     heatmap_data = self.heatmap_data[index]
     filtered_heatmap_data = self.filter(heatmap_data,gauss_kernel_length=gauss_kernel_length,gauss_sigma=gauss_sigma)
+    
+    if save_path_filtred_heatmap is not None:
+        try:
+            heatmap_path = os.path.join(save_path_filtred_heatmap, self.timestamps_to_load[index] + ".fradar")
+            pickle.dump(filtered_heatmap_data,open(heatmap_path,"wb"))
+        except:
+            print("WARNING: Unable to save the filtered heatmap")
+    
+    
     
     cfar_data, _, spotted = self.calculate_CFAR(filtered_heatmap_data,threshold=cfar_threshold)
     

@@ -97,6 +97,21 @@ class MultimodalAnalysisResult:
         
     def set_position(self,position):
         self.position = position
+        
+    def export_dict(self):
+        to_export = {
+            "couple_id":self.timestamp,
+            "timestamp":self.timestamp,
+            "bb":self.image_info[0]["bbox"],
+            "x":self.position[0],
+            "y":self.position[1],
+            "z":self.position[2],
+            "v": self.heatmap_info[0]["speed"],
+            "d": self.heatmap_info[0]["distance"],
+            
+        }
+        
+        return to_export
 
 def get_caracteristic_length(analysis_result: MultimodalAnalysisResult):
     """Get the caracteristic length of the detected vehicle
@@ -127,7 +142,7 @@ def from_multimodal_analysis_result_to_3d(analysis:MultimodalAnalysisResult,came
     distance = analysis.heatmap_info[0]["distance"]
     
     def from_point_to_3d(x,y,distance,camera_parameters):
-        fx, fy = camera_parameters['focal_length_y'], camera_parameters['focal_length_y']
+        fx, fy = camera_parameters['focal_length'], camera_parameters['focal_length']
         cx = camera_parameters['principal_point'][0]
         cy = camera_parameters['principal_point'][1]
         

@@ -58,19 +58,68 @@ def save_mean_heatmap_data(self, mean_data_path):
     with open(mean_data_path,"wb") as f:
         pickle.dump(self.heatmap_mean, f)
 
-def save_annotated_picture(self,index,extention="jpg"):
+def save_picture(self,index,output_dir=None,extention="jpg",annotated=False):
     """Utility function to save the annotated picture
     """
-    if self.picture_output_dir is None:
+    if output_dir is None:
+        output_dir = self.picture_output_dir
+    
+    if output_dir is None:
         raise ValueError("Please set the output directory for the picture")
     
-    os.makedirs(self.picture_output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     
-    picture_data = self.picture_data_annotated[index]
+    if not annotated:
+        picture_data = self.picture_data[index]
+    else:
+        picture_data = self.picture_data_annotated[index]
     
-    image_path = os.path.join(self.picture_output_dir, self.timestamps_to_load[index] + "."+extention)
+    image_path = os.path.join(output_dir, self.timestamps_to_load[index] + "."+extention)
     
     picture_data = cv2.cvtColor(picture_data.astype('float32'), cv2.COLOR_BGR2RGB)
     
     cv2.imwrite(image_path, picture_data)
+    
+def save_heatmap(self,index,output_dir=None):
+    """Utility function to save the annotated heatmap
+    """
+    if output_dir is None:
+        output_dir = self.heatmap_output_dir
+     
+    if output_dir is None:
+        raise ValueError("Please set the output directory for the heatmap")
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    
+    heatmap_data = self.heatmap_data[index]
+    
+    
+    heatmap_path = os.path.join(output_dir, self.timestamps_to_load[index] + ".radar")
+    with open(heatmap_path,"wb") as f:
+        pickle.dump(heatmap_data, f)
+    
+def get_metadata(self):
+    """Get the metadata of the loaded data and return it as a dictionary
+    """
+    
+    metadata = {}
+    
+    metadata["camera"] = {
+        "resolution": self.camera_parameters["image_size"],
+        "intrinsic_parameters": {
+            "focal_length": self.camera_parameters["focal_length"],
+            "skew": self.camera_parameters["skew"],
+            "distortion_coefficients": self.camera_parameters["distortion_coefficients"],
+            },
+    }
+    
+    metadata["radar"] = {
+        "d_max": self.radar_parameters["distance"][0],
+        "d_min": self.radar_parameters["distance"][1],
+        "s_max": self.radar_parameters["speed"][1],
+        "s_min": self.radar_parameters["speed"][0],
+    }
+    
+    return metadata
     

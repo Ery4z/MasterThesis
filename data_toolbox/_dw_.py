@@ -35,7 +35,7 @@ yolo = get_yolo()
 
 
 
-CAMERA_PARAM = {'focal_length_x':2637,'focal_length_y':5695, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
+CAMERA_PARAM = {'skew':0,'distortion_coefficients':0,'focal_length':5695, 'image_size':(1920,1080),'principal_point':(1920/2,1080/2), 'fov':30}
 FILE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -56,7 +56,7 @@ class DataWrapper:
     # Importing the method of the class
     from ._dw_plot import plot_background, plot_mean, plot, plot_radar_wrapper, plot_CFAR, plot_comparison_filter
     from ._dw_data_loading import check_timestamp, check_directory, load_file, load_heatmap_data,load_picture_data
-    from ._dw_utilities import get_color_map,set_background_data,save_mean_heatmap_data,set_mean_heatmap_data,save_annotated_picture
+    from ._dw_utilities import get_color_map,set_background_data,save_mean_heatmap_data,set_mean_heatmap_data,save_picture,save_heatmap,get_metadata
     from ._dw_processing import pipeline_process,filter, analyse_couple,remove_background_data,calculate_heatmap_mean,remove_temporal_mean,analyse_image,add_annotation,calculate_CFAR,add_identification
     
     def __init__(self, heatmap_dir, picture_dir, timestamps_to_load, picture_name_prefix="", picture_extension_suffix="jpeg", heatmap_extension_suffix="doppler", heatmap_name_prefix="",picture_output_dir=None,silent=False):

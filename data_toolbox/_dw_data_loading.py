@@ -12,7 +12,7 @@ def check_timestamp(self):
         available_pictures = [f for f in os.listdir(self.picture_dir) if f.split(".")[-1] == self.picture_extension_suffix]
         available_heatmaps = [f for f in os.listdir(self.heatmap_dir) if f.split(".")[-1] == self.heatmap_extension_suffix]
         
-        iterable = tqdm(self.timestamps_to_load,desc="Checking file existence") if not self.silent else self.timestamps_to_load
+        iterable = tqdm(self.timestamps_to_load,desc="Checking file existence",leave=False) if not self.silent else self.timestamps_to_load
 
         for timestamp in iterable:
 
@@ -49,7 +49,7 @@ def load_heatmap_data(self):
     """
     tmp_data_list = []
     
-    iterator = tqdm(self.timestamps_to_load,desc="Loading heatmap data") if not self.silent else self.timestamps_to_load
+    iterator = tqdm(self.timestamps_to_load,desc="Loading heatmap data",leave=False) if not self.silent else self.timestamps_to_load
 
     
     for timestamp in iterator:
@@ -71,7 +71,7 @@ def load_picture_data(self):
     """
     tmp_data_list = []
     
-    iterator = tqdm(self.timestamps_to_load,desc="Loading picture data") if not self.silent else self.timestamps_to_load
+    iterator = tqdm(self.timestamps_to_load,desc="Loading picture data",leave=False) if not self.silent else self.timestamps_to_load
     
     for timestamp in iterator:
         

@@ -12,6 +12,9 @@ from .._identifier import VehicleIdentifier
 
 from ..utilities import generate_video_annotated
 
+
+import matplotlib.pyplot as plt
+
 def analyse_dataset_batch(FILE_DIRECTORY,BATCH_SIZE = 200,FILE_COUNT_TO_LOAD = 10000,customfilter=None,cfar_threshold=52000,save=True,gauss_kernel_length=11,gauss_sigma=0.5,silent=False):
     """Function used to analyse the dataset. This is the low level wrapper allowing to analyse the dataset in batches. This is useful when the dataset is too large to be loaded in memory.
     Use this function as an utility for more complex analysis.
@@ -359,7 +362,10 @@ def dataset_visual_identification_analysis(FILE_DIRECTORY,export_video=True,show
     timestamps_to_load_total = list([".".join(f.split(".")[:2]) for f in os.listdir(heatmap_directory) if "doppler" in f])
     timestamps_to_load_total = timestamps_to_load_total[0:min(FILE_COUNT_TO_LOAD,len(timestamps_to_load_total))]
     
-    identifier = VehicleIdentifier().set_metric_example().set_metric_euclidian_distance().set_metric_bb_common_area()
+    identifier = VehicleIdentifier().set_metric_example().set_metric_euclidian_distance().set_metric_bb_common_area().set_metric_time_delay()
+    
+    identified_lenght = {}
+    
     
     # Delete content of output directory
     
@@ -390,15 +396,34 @@ def dataset_visual_identification_analysis(FILE_DIRECTORY,export_video=True,show
             res_analyses.append(res_ana)
             if res is not None:
                 vehicle_identifier,score_detail = identifier.identify(res_ana,get_score_detail=True)
+                
+                if vehicle_identifier not in identified_lenght:
+                    identified_lenght[vehicle_identifier] = []
+                    
+                identified_lenght[vehicle_identifier].append([res_ana.timestamp,res_ana.caracteristic_length])
+                
                 dataWrapper.add_identification(i,res_ana.image_info[0]["bbox"],vehicle_identifier,score_details=score_detail)
                 if show_plot:
                     dataWrapper.plot_CFAR(i,annotated=True)
-            dataWrapper.save_annotated_picture(i)
+            dataWrapper.save_picture(i,annotated=True)
     
     if export_video:
         
         generate_video_annotated(output_directory)
+    
+    
+    plt.figure()
+    
+    for vehicle in identified_lenght:
+        X = [x[0] for x in identified_lenght[vehicle]]
+        Y = [x[1] for x in identified_lenght[vehicle]]
         
+        plt.plot(X,Y,label=vehicle)
+        
+    plt.grid()
+    # plt.legend()
+    plt.show()
+    
     # Remove the pictures from the output directory
     
     """for f in os.listdir(output_directory):

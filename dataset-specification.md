@@ -35,10 +35,9 @@ dataset
 │   │   └───<radar_id>.radar
 │   ├───filtered_radar
 │   │   └───<radar_id>.fradar
-│   ├───metadata
-│   │   └───<capture_session_id>_meta.json
-│   └───vehicles
-│       └───<capture_session_id>_vehicles.json
+│   ├───vehicles
+│   │   └───vehicles.json
+│   └───metadata.json
 └───...
 
 ```
