@@ -100,13 +100,12 @@ def labelize_dataset(base_path,dataset_path,FILE_COUNT_TO_LABELIZE=None,silent=F
             res_analyses.append(res_ana)
             if res is not None:
                 vehicle_identifier,score_detail = identifier.identify(res_ana,get_score_detail=True)
-                dataWrapper.add_identification(i,res_ana.image_info[0]["bbox"],vehicle_identifier,score_details=score_detail)
 
                 if vehicle_identifier not in vehicle_id_dict:
                     vehicle_id_dict[vehicle_identifier] = []
                     
                 vehicle_id_dict[vehicle_identifier].append(res_ana.export_dict())
-            dataWrapper.save_picture(i,output_dir=DATASET_CAMERA_PATH,annotated=True)
+            dataWrapper.save_picture(i,output_dir=DATASET_CAMERA_PATH,annotated=False)
             dataWrapper.save_heatmap(i,output_dir=DATASET_RADAR_PATH)
         
         # Flushing and saving the archived vehicle id to avoid memory overflow

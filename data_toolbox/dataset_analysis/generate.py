@@ -12,6 +12,8 @@ from .._identifier import VehicleIdentifier
 
 from ..utilities import generate_video_annotated
 
+import tarfile
+
 
 import matplotlib.pyplot as plt
 
@@ -430,6 +432,76 @@ def dataset_visual_identification_analysis(FILE_DIRECTORY,export_video=True,show
         if "jpg" in f:
             os.remove(os.path.join(output_directory,f))"""
             
-                
+
+def analyse_labelized_dataset_session(session_directory,extract=False): 
+    # Load the vehicle file
+    
+    if extract:
+        f = tarfile.open(os.path.join(session_directory,"vehicles.tar.gz"))
+        f.extractall(session_directory)
+        f.close()
+        
+        
+    
+    
+    vehicle_file = os.path.join(session_directory,"vehicles","vehicles.json")
+    
+    #
+    
+    vehicle_data = json.load(open(vehicle_file))
+    
+    image_count=[]
+    
+    
+    for vehicle_identifier in vehicle_data:
+        list_images = vehicle_data[vehicle_identifier]
+        image_count.append(len(list_images))
+        
+    # Represent as an histogram
+    
+    plt.figure()
+    plt.hist(image_count,bins=range(0,max(image_count)+1))
+    plt.hist(image_count,bins=range(0,max(image_count)+1),cumulative=True,histtype='step')
+    
+    plt.grid()
+    plt.show()
+
+    
+    
+        
+    
+    
+def analyse_labelized_dataset(dataset_directory,extract=False): 
+    
+    image_count=[]
+    for session_directory in os.listdir(dataset_directory):
+        if not os.path.isdir(os.path.join(dataset_directory,session_directory)):
+            continue
+        
+        if extract:
+            os.system("tar -xvf "+os.path.join(dataset_directory,session_directory,"vehicles","vehicles.tar.gz")+" -C "+os.path.join(dataset_directory,session_directory,"vehicles"))
+        
+        vehicle_file = os.path.join(dataset_directory,session_directory,"vehicles","vehicles.json")
+        # Load the vehicle file
+    
+        vehicle_data = json.load(open(vehicle_file))
+
+
+
+        for vehicle_identifier in vehicle_data:
+            list_images = vehicle_data[vehicle_identifier]
+            image_count.append(len(list_images))
+        
+    # Represent as an histogram
+    
+    plt.figure()
+    plt.hist(image_count,bins=range(0,max(image_count)+1))
+    plt.hist(image_count,bins=range(0,max(image_count)+1),cumulative=True,histtype='step')
+    
+    plt.xlabel("Number of images per vehicle")
+    plt.ylabel("Number of vehicles")
+    
+    plt.grid()
+    plt.show()                
     
     

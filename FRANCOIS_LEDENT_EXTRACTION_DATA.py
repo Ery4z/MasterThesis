@@ -26,6 +26,7 @@ SAVE_DOPPLER = True
 SAVE_MAGN = True
 
 def verify_and_delete_images_in_dir(directory):
+    """Delete images that are not readable by PIL as some are corrupted"""
     for file in tqdm(os.listdir(directory),desc="Verifying images",unit="images",leave=False):
         data = None
         try:
@@ -70,6 +71,14 @@ def get_filename(directory, timestamp, extension):
 
 
 def align_seq(path_source_radar, path_source_camera, path_dest_radar, path_dest_camera):
+    """Main function of the script, aligns the sequences and copies the files to the destination folders
+
+    Args:
+        path_source_radar (str):  Path to the folder containing the radar files
+        path_source_camera (str): Path to the folder containing the camera files
+        path_dest_radar (str):  Path to the folder where the aligned radar files will be copied
+        path_dest_camera (str): Path to the folder where the aligned camera files will be copied
+    """
     assert check_subdirs(path_source_camera, path_source_radar), "assertion"
     create_subdirs(path_dest_radar, path_dest_camera)
 
@@ -102,7 +111,7 @@ def load_file(filename):
         return pickle.load(f)
 
 
-def content_doppler_magn(file, inst, path_source_radar, path_dest_radar,save_one_file):
+def content_doppler_magn(file, path_source_radar, path_dest_radar,save_one_file):
 
     content = np.empty((256, 256), dtype="complex")
 
@@ -147,7 +156,7 @@ def content_doppler_magn(file, inst, path_source_radar, path_dest_radar,save_one
             magn = 20*np.log(np.abs(doppler))
             save_file(os.path.join(path_dest_radar,file+f".magn"), magn)
 
-    inst.increment()
+    
 
 
 class ProgressBar(object):
@@ -206,20 +215,17 @@ def get_graphs(path_source_radar, path_dest_radar,save_one_file=False):
     create_subdirs(path_dest_radar)
 
     files_radar, _ = get_files_times(path_source_radar, ".raw")
-    pool = Pool(processes=NCPU)
+    # pool = Pool(processes=2)
 
-    BaseManager.register('ProgressBar', ProgressBar)
-    manager = BaseManager()
-    manager.start()
-    inst = manager.ProgressBar(files_radar.shape[0], "Doppler Graphs")
-    #inst = ProgressBar(files_radar.shape[0], "Doppler Graphs")
+    # BaseManager.register('ProgressBar', ProgressBar)
 
     for file in files_radar:
-        pool.apply_async(content_doppler_magn, args=(file, inst, path_source_radar, path_dest_radar,save_one_file))
-        #content_doppler_magn(file, inst)
+        # pool.apply_async(content_doppler_magn, args=(file, inst, path_source_radar, path_dest_radar,save_one_file))
+        content_doppler_magn(file, path_source_radar, path_dest_radar,save_one_file)
+        
 
-    pool.close()
-    pool.join()
+    # pool.close()
+    # pool.join()
 
 
 # not used
