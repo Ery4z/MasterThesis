@@ -473,8 +473,13 @@ def analyse_labelized_dataset_session(session_directory,extract=False):
     
 def analyse_labelized_dataset(dataset_directory,extract=False): 
     
+    
+    image_count_session=[]
+    
     image_count=[]
     for session_directory in os.listdir(dataset_directory):
+        session_data =[]
+        
         if not os.path.isdir(os.path.join(dataset_directory,session_directory)):
             continue
         
@@ -491,10 +496,18 @@ def analyse_labelized_dataset(dataset_directory,extract=False):
         for vehicle_identifier in vehicle_data:
             list_images = vehicle_data[vehicle_identifier]
             image_count.append(len(list_images))
+            session_data.append(len(list_images))
         
+        image_count_session.append(session_data)
+    
+    print("Total number of images : "+str(sum(image_count)))
+    print("Total number of vehicles : "+str(len(image_count)))
+    print("Average number of images per vehicle : "+str(sum(image_count)/len(image_count)))
+    print("Number of vehicles with more than 10 images : "+str(len([x for x in image_count if x>10])))
     # Represent as an histogram
     
     plt.figure()
+
     plt.hist(image_count,bins=range(0,max(image_count)+1))
     plt.hist(image_count,bins=range(0,max(image_count)+1),cumulative=True,histtype='step')
     
@@ -502,6 +515,103 @@ def analyse_labelized_dataset(dataset_directory,extract=False):
     plt.ylabel("Number of vehicles")
     
     plt.grid()
-    plt.show()                
+    
+    
+    plt.show()        
+    
+    
+    import seaborn as sns        
+    import pandas as pd
+    
+    # create a df with 2 columns session is the first dimension of image_count_session and the second dimension is the number of images per vehicle
+    df = pd.DataFrame([[x,y] for x in range(len(image_count_session)) for y in image_count_session[x]],columns=["session","number of images per vehicle"])
+    
+    
+    
+    
+    sns.boxplot(data=df, x='session', y='number of images per vehicle')
+    sns.swarmplot(data=df, x='session', y='number of images per vehicle', color=".25")
+    
+    # Now print the statistics for each session
+    for i in range(len(image_count_session)):
+        print("Session "+str(i)+" : "+str(len(image_count_session[i]))+" vehicles")
+        print("Max number of images per vehicle : "+str(max(image_count_session[i])))
+        print("Min number of images per vehicle : "+str(min(image_count_session[i])))
+        print("Average number of images per vehicle : "+str(sum(image_count_session[i])/len(image_count_session[i])))
+        print("Quantile 10% : "+str(np.quantile(image_count_session[i],0.1)))
+        print("Quantile 25% : "+str(np.quantile(image_count_session[i],0.25)))
+        print("Quantile 50% : "+str(np.quantile(image_count_session[i],0.5)))
+        print("Quantile 75% : "+str(np.quantile(image_count_session[i],0.75)))
+        print("Quantile 90% : "+str(np.quantile(image_count_session[i],0.9)))
+        print("Count: " + str(len(image_count_session[i])))
+        
+        
+        print(f"{str(i)} & {sum(image_count_session[i])/len(image_count_session[i])} & {len(image_count_session[i])} & {min(image_count_session[i])} & {max(image_count_session[i])} & {np.quantile(image_count_session[i],0.1)} & {np.quantile(image_count_session[i],0.25)} & {np.quantile(image_count_session[i],0.5)} & {np.quantile(image_count_session[i],0.75)} & {np.quantile(image_count_session[i],0.9)}\\\\ \\hline")
+        
+    
+    
+    
+    plt.figure()
+    plt.subplot(2,1,1)
+    # Represent the number of images per session as boxplot
+    plt.boxplot(image_count_session)
+    plt.xlabel("Session")
+    plt.ylabel("Number of images per vehicle")
+    plt.grid()
+    
+    plt.subplot(2,1,2)
+    plt.stairs([len(x) for x in image_count_session],fill=True)
+    plt.xlabel("Session")
+    plt.ylabel("Number of vehicles")
+    plt.grid()
+    plt.show()
+    
+    
+    # ploting the 2D histogram
+    # x: session
+    # y: number of images per vehicle
+    # z: number of vehicles
+    
+    plt.figure()
+    plt.hist2d([x for x in range(len(image_count_session)) for y in image_count_session[x]],[y for x in range(len(image_count_session)) for y in image_count_session[x]],bins=[range(0,len(image_count_session)+1),range(0,max(image_count)+1)])
+    # Add colorbar, make sure to specify tick locations to match desired ticklabels
+    plt.colorbar()
+    
+    plt.xlabel("Session")
+    plt.ylabel("Number of images per vehicle")
+    plt.grid()
+    plt.show()
+    
+    # Plot the inverse cumulative histogram of the number of images per vehicle 2D
+    # x: number of images per vehicle
+    # y: number of vehicles with more than x images
+    # z: number of vehicles
+    # Get max image count across all sessions
+    max_image_count = max([max(session) for session in image_count_session])
+
+    # Initialize a 2D array for counts
+    counts = np.zeros((len(image_count_session), max_image_count+1))
+
+    # Populate the counts array
+    for i, session in enumerate(image_count_session):
+        for j in range(max_image_count+1):
+            counts[i, j] = sum(y >= j for y in session)
+
+    # Prepare data for 2D histogram
+    dist1, dist2 = np.nonzero(counts)
+    dist3 = counts[dist1, dist2]
+
+    # Plot
+    plt.figure()
+    plt.hist2d(dist1, dist2, weights=dist3, bins=[range(0, len(image_count_session)+1), range(0, max_image_count+1)])
+    cbar = plt.colorbar(label='Number of vehicles with at least y images')
+    cbar.set_label(label='Number of vehicles with at least y images')
+    
+    plt.xlabel('Session')
+    plt.ylabel('Number of images per vehicle')
+    plt.grid(True)
+    plt.show()
+    
+    
     
     
